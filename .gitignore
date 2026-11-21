@@ -1,0 +1,10 @@
+data/
+rag/data/
+.env
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+.next/
+.cache/
+.pytest_cache/
