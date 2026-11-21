@@ -72,13 +72,24 @@ def extract_figure_units(
                     )
                     continue
 
+                page = doc[reg.page - 1]
+                clip_rect = fitz.Rect(*reg.bbox) & page.rect
+                if clip_rect.is_empty:
+                    filtered_out.append(
+                        {
+                            "doc_id": reg.doc_id,
+                            "page": reg.page,
+                            "bbox": reg.bbox,
+                            "reason": "bbox_outside_page",
+                        }
+                    )
+                    continue
+
                 key = (reg.doc_id, reg.page)
                 seq = per_page_seq.get(key, 0) + 1
                 per_page_seq[key] = seq
                 unit_id = f"{reg.doc_id}__p{reg.page:04d}__figure_{seq:03d}"
 
-                page = doc[reg.page - 1]
-                clip_rect = fitz.Rect(*reg.bbox) & page.rect
                 pix = page.get_pixmap(clip=clip_rect, dpi=cfg.extract.figure_render_dpi)
                 img_path = out_dir / f"{unit_id}.png"
                 pix.save(str(img_path))
@@ -93,6 +104,8 @@ def extract_figure_units(
                     nearby_caption=reg.nearby_caption,
                     model_variant=reg.model_variant,
                     extraction_meta={
+                        "figure_source": reg.meta.get("source", "raster"),
+                        "figure_labels": reg.meta.get("figure_labels", []),
                         "xref": reg.meta.get("xref", 0),
                         "dpi": cfg.extract.figure_render_dpi,
                         "width_px": pix.width,

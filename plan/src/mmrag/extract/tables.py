@@ -10,6 +10,19 @@ from mmrag.config import AppConfig
 from mmrag.schemas import Provenance, RawRegion, TableArtefact, Unit
 
 
+def _normalize_table_grid(rows: list[list[str]]) -> tuple[list[str], list[list[str]]]:
+    """Splits header/data rows and squares the grid so every row aligns with a named header.
+
+    Blank header cells get `Col_N` placeholders and ragged rows are padded, so downstream
+    `Header = Value` linearization never emits a value without its column name.
+    """
+    width = max(len(r) for r in rows)
+    grid = [list(r) + [""] * (width - len(r)) for r in rows]
+    headers = [h if h else f"Col_{i + 1}" for i, h in enumerate(grid[0])]
+    data_rows = grid[1:] if len(grid) > 1 else grid
+    return headers, data_rows
+
+
 def extract_table_units(regions: list[RawRegion], cfg: AppConfig) -> list[Unit]:
     """Converts routed table regions into structured `Unit(type='table')` objects (Story E2.2)."""
     table_units: list[Unit] = []
@@ -27,8 +40,7 @@ def extract_table_units(regions: list[RawRegion], cfg: AppConfig) -> list[Unit]:
         per_page_seq[key] = seq
         unit_id = f"{reg.doc_id}__p{reg.page:04d}__table_{seq:03d}"
 
-        headers = rows[0] if len(rows) >= 1 else []
-        data_rows = rows[1:] if len(rows) > 1 else rows
+        headers, data_rows = _normalize_table_grid(rows)
 
         prov = Provenance(
             doc_id=reg.doc_id,
