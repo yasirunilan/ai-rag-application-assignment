@@ -1,0 +1,10 @@
+{
+  "total_units": 10,
+  "embedding_dim": 384,
+  "type_counts": {
+    "text": 5,
+    "figure": 3,
+    "table": 2
+  },
+  "has_faiss_file": true
+}

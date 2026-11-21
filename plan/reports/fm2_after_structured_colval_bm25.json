@@ -1,0 +1,105 @@
+{
+  "experiment_name": "fm2_after_structured_colval_bm25",
+  "k": 5,
+  "overall_page_recall_at_k": 1.0,
+  "overall_page_mrr": 1.0,
+  "overall_strict_recall_at_k": 1.0,
+  "overall_strict_mrr": 0.9583,
+  "by_type": {
+    "text": {
+      "unit_type": "text",
+      "num_queries": 4,
+      "page_recall_at_k": 1.0,
+      "page_mrr": 1.0,
+      "strict_recall_at_k": 1.0,
+      "strict_mrr": 1.0
+    },
+    "figure": {
+      "unit_type": "figure",
+      "num_queries": 4,
+      "page_recall_at_k": 1.0,
+      "page_mrr": 1.0,
+      "strict_recall_at_k": 1.0,
+      "strict_mrr": 0.875
+    },
+    "table": {
+      "unit_type": "table",
+      "num_queries": 4,
+      "page_recall_at_k": 1.0,
+      "page_mrr": 1.0,
+      "strict_recall_at_k": 1.0,
+      "strict_mrr": 1.0
+    }
+  },
+  "faithfulness_pass_rate": 1.0,
+  "faithfulness_details": [
+    {
+      "query_id": "Q_FIG_01",
+      "query": "Show the engine starter relay control wiring diagram for Model 737-800",
+      "expected_type": "figure",
+      "gold_citation": "amt_handbook p.3",
+      "gold_hint": "Figure 9-14",
+      "returned_citation": "amt_handbook p.3",
+      "returned_modality": "figure",
+      "grounded_caption": "Figure 9-14. Engine Starter Relay Control Wiring Diagram (Model 737-800)",
+      "faithful": true,
+      "flag": "OK_EXACT_ARTEFACT"
+    },
+    {
+      "query_id": "Q_FIG_02",
+      "query": "Show the AC generator control relay and bus tie schematic for Model 737-400",
+      "expected_type": "figure",
+      "gold_citation": "amt_handbook p.2",
+      "gold_hint": "Figure 9-12",
+      "returned_citation": "amt_handbook p.2",
+      "returned_modality": "figure",
+      "grounded_caption": "Figure 9-12. Generator Control Relay & Bus Tie Schematic (Model 737-400)",
+      "faithful": true,
+      "flag": "OK_EXACT_ARTEFACT"
+    },
+    {
+      "query_id": "Q_TAB_01",
+      "query": "What is the dry and lubed torque spec table for bolt part number AN4-12A?",
+      "expected_type": "table",
+      "gold_citation": "amt_handbook p.1",
+      "gold_hint": "Table 4-1",
+      "returned_citation": "amt_handbook p.1",
+      "returned_modality": "table",
+      "grounded_caption": "Table 4-1. Standard Airframe Bolt Torque Specifications (Model 737-800)",
+      "faithful": true,
+      "flag": "OK_EXACT_ARTEFACT"
+    },
+    {
+      "query_id": "Q_TAB_02",
+      "query": "Lookup table entry and specifications for part number NAS1304-15",
+      "expected_type": "table",
+      "gold_citation": "amt_handbook p.1",
+      "gold_hint": "Table 4-1",
+      "returned_citation": "amt_handbook p.1",
+      "returned_modality": "table",
+      "grounded_caption": "Table 4-1. Standard Airframe Bolt Torque Specifications (Model 737-800)",
+      "faithful": true,
+      "flag": "OK_EXACT_ARTEFACT"
+    },
+    {
+      "query_id": "Q_TXT_01",
+      "query": "What is the nominal operating pressure and thermal relief valve cracking pressure of the 737-800 hydraulic flight control system?",
+      "expected_type": "text",
+      "gold_citation": "amt_handbook p.1",
+      "gold_hint": "3,000 PSI",
+      "returned_citation": "amt_handbook p.1",
+      "returned_modality": "text",
+      "grounded_caption": null,
+      "faithful": true,
+      "flag": "OK_EXACT_ARTEFACT"
+    }
+  ],
+  "config_snapshot": {
+    "include_nearby_context": true,
+    "flatten_tables": false,
+    "table_linearization_mode": "col_val_and_markdown",
+    "enable_bm25_fusion": true,
+    "alpha": 0.6,
+    "ocr_gate_enabled": true
+  }
+}
