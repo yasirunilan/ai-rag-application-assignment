@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mmrag"
+version = "0.1.0"
+description = "Course 3 Day 2 Lab A: Rich Answers, Not Just Text — Multimodal Retrieval over Technical Manuals"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.5.0",
+    "pyyaml>=6.0",
+    "numpy>=1.26.0",
+    "pymupdf>=1.24.0",
+    "pdfplumber>=0.11.0",
+    "pillow>=10.0.0",
+    "rank-bm25>=0.2.2",
+    "pytesseract>=0.3.10",
+    "pytest>=8.0.0",
+]
+
+[project.optional-dependencies]
+faiss = [
+    "faiss-cpu>=1.8.0",
+]
+fastembed = [
+    "fastembed>=0.3.0",
+]
+docling = [
+    "docling>=2.0.0",
+]
+local-vision = [
+    "transformers>=4.40.0",
+    "torch>=2.2.0",
+]
+
+[project.scripts]
+mmrag = "mmrag.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-v --tb=short"
