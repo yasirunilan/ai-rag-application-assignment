@@ -35,10 +35,17 @@ TABLE_CAPTION_PATTERN = re.compile(
     r"^(Table|Tbl\.)\s+\d+(?:[-.]\d+)?",
     re.IGNORECASE,
 )
+# Model token must contain a digit so prose like "this model is" is not mistaken for a variant.
 MODEL_VARIANT_PATTERN = re.compile(
-    r"\b(Model\s+[A-Z0-9-]+|737-\d{3}|A320(?:-\d{3})?)\b",
+    r"\b(Model\s+(?=[A-Z0-9-]*\d)[A-Z0-9-]+|7[0-8]7-\d{3}|A3[0-8]\d(?:-\d{3})?)\b",
     re.IGNORECASE,
 )
+CHAPTER_HEADING_PATTERN = re.compile(r"^Chapter\s+\d+", re.IGNORECASE)
+
+# Vector drawing clusters covering more of the page than this are page frames/backgrounds, not figures.
+MAX_VECTOR_FIGURE_PAGE_COVERAGE = 0.80
+# Raster/vector figure candidates overlapping an existing candidate beyond this IoU are duplicates.
+DUPLICATE_FIGURE_IOU = 0.90
 
 
 def explain_naive_loader_drops(pdf_path: str | Path) -> dict[str, Any]:
@@ -92,9 +99,76 @@ def _rect_overlap_ratio(inner: fitz.Rect, outer: fitz.Rect) -> float:
     return (inter.width * inter.height) / inner_area
 
 
+def _rect_iou(a: fitz.Rect, b: fitz.Rect) -> float:
+    inter = a & b
+    if inter.is_empty:
+        return 0.0
+    inter_area = inter.width * inter.height
+    union_area = a.width * a.height + b.width * b.height - inter_area
+    return inter_area / max(1.0, union_area)
+
+
+def _horizontal_overlap(a: fitz.Rect, b: fitz.Rect) -> bool:
+    return min(a.x1, b.x1) > max(a.x0, b.x0)
+
+
 def _extract_model_variant(text: str) -> Optional[str]:
     m = MODEL_VARIANT_PATTERN.search(text)
     return m.group(1) if m else None
+
+
+def _heading_level(line: str) -> int:
+    """1 = chapter-level heading, 2 = section-level heading."""
+    return 1 if CHAPTER_HEADING_PATTERN.match(line) else 2
+
+
+def _join_heading_state(state: dict[int, str]) -> Optional[str]:
+    parts = [state[lvl] for lvl in sorted(state)]
+    return " — ".join(parts) if parts else None
+
+
+def _heading_at(
+    y: float,
+    carried_state: dict[int, str],
+    page_headings: list[dict[str, Any]],
+) -> Optional[str]:
+    """Hierarchical heading context in force at vertical position `y` on the page."""
+    state = dict(carried_state)
+    for h in page_headings:
+        if h["y0"] > y:
+            break
+        if h["level"] == 1:
+            state = {}
+        state[h["level"]] = h["text"]
+    return _join_heading_state(state)
+
+
+def _find_tables(pdf_page: Any, fitz_page: fitz.Page, backend: str) -> list[tuple[tuple[float, ...], list]]:
+    """Returns `(bbox, rows)` per detected table using the configured backend (Story E1.1 / E2.2)."""
+    if backend == "pymupdf":
+        found = fitz_page.find_tables().tables
+    else:
+        found = pdf_page.find_tables()
+    return [(tuple(t.bbox), t.extract() or []) for t in found]
+
+
+def _match_caption(
+    target: fitz.Rect,
+    captions: list[dict[str, Any]],
+    margin: float,
+) -> Optional[str]:
+    """Nearest caption above or below `target` that shares its column, within `margin` points."""
+    best: Optional[str] = None
+    best_dist = 9999.0
+    for cap in captions:
+        c_rect: fitz.Rect = cap["rect"]
+        if not _horizontal_overlap(target, c_rect):
+            continue
+        dist = min(abs(target.y1 - c_rect.y0), abs(c_rect.y1 - target.y0))
+        if dist <= margin and dist < best_dist:
+            best_dist = dist
+            best = cap["text"]
+    return best
 
 
 def parse_and_route_pdf(
@@ -108,6 +182,8 @@ def parse_and_route_pdf(
 
     classifications: list[PageClassification] = []
     regions: list[RawRegion] = []
+    # Heading hierarchy carried from previous pages so continuation pages keep their section context
+    carried_headings: dict[int, str] = {}
 
     with fitz.open(str(path)) as doc, pdfplumber.open(str(path)) as pdoc:
         for page_idx, page in enumerate(doc):
@@ -153,7 +229,7 @@ def parse_and_route_pdf(
                             bbox=(0.0, 0.0, float(page.rect.width), float(page.rect.height)),
                             reading_order=1,
                             raw_text=ocr_text.strip(),
-                            heading_context=f"Scanned Page {page_num}",
+                            heading_context=_join_heading_state(carried_headings) or f"Scanned Page {page_num}",
                             source_path=str(path),
                             meta={"from_ocr": True, "ocr_confidence": mean_conf},
                         )
@@ -173,64 +249,91 @@ def parse_and_route_pdf(
                 )
             )
 
-            # 1. Collect raw text blocks sorted in top-to-bottom reading order
-            raw_blocks = page.get_text("blocks")
+            # 1. Collect raw text blocks (with per-line boxes) sorted in top-to-bottom reading order
             text_blocks: list[dict[str, Any]] = []
-            for b in raw_blocks:
-                x0, y0, x1, y1, txt, block_no, block_type = b
-                clean = str(txt).strip()
-                if block_type == 0 and clean:
-                    text_blocks.append(
-                        {
-                            "rect": fitz.Rect(x0, y0, x1, y1),
-                            "text": clean,
-                            "y0": float(y0),
-                            "x0": float(x0),
-                        }
-                    )
+            for b in page.get_text("dict")["blocks"]:
+                if b.get("type") != 0:
+                    continue
+                lines = [
+                    {"rect": fitz.Rect(ln["bbox"]), "text": "".join(sp["text"] for sp in ln["spans"]).strip()}
+                    for ln in b.get("lines", [])
+                ]
+                lines = [ln for ln in lines if ln["text"]]
+                if not lines:
+                    continue
+                x0, y0, x1, y1 = b["bbox"]
+                text_blocks.append(
+                    {
+                        "rect": fitz.Rect(x0, y0, x1, y1),
+                        "text": "\n".join(ln["text"] for ln in lines),
+                        "lines": lines,
+                        "y0": float(y0),
+                        "x0": float(x0),
+                    }
+                )
             text_blocks.sort(key=lambda item: (round(item["y0"], 1), round(item["x0"], 1)))
 
             # Identify page-level headings, captions, and model variants
-            page_headings: list[str] = []
+            page_headings: list[dict[str, Any]] = []
             figure_captions: list[dict[str, Any]] = []
             table_captions: list[dict[str, Any]] = []
             page_model_variant: Optional[str] = None
 
             for tb in text_blocks:
                 single_line = " ".join(tb["text"].split())
+                first_line = " ".join(tb["lines"][0]["text"].split())
                 if not page_model_variant:
                     page_model_variant = _extract_model_variant(single_line)
-                if HEADING_PATTERN.match(single_line):
-                    page_headings.append(single_line)
-                elif FIGURE_CAPTION_PATTERN.match(single_line):
-                    figure_captions.append({"rect": tb["rect"], "text": single_line})
-                elif TABLE_CAPTION_PATTERN.match(single_line):
-                    table_captions.append({"rect": tb["rect"], "text": single_line})
+                if HEADING_PATTERN.match(first_line):
+                    page_headings.append(
+                        {"y0": tb["y0"], "text": first_line, "level": _heading_level(first_line)}
+                    )
+                elif FIGURE_CAPTION_PATTERN.match(first_line) or TABLE_CAPTION_PATTERN.match(first_line):
+                    # One block can hold several captions (e.g. side-by-side columns on one baseline):
+                    # start a new caption at every caption-pattern line, folding continuation lines in.
+                    tb["is_caption"] = True
+                    segments: list[dict[str, Any]] = []
+                    for ln in tb["lines"]:
+                        ln_text = " ".join(ln["text"].split())
+                        if FIGURE_CAPTION_PATTERN.match(ln_text) or TABLE_CAPTION_PATTERN.match(ln_text):
+                            segments.append({"rect": fitz.Rect(ln["rect"]), "text": ln_text})
+                        else:
+                            segments[-1]["rect"] |= ln["rect"]
+                            segments[-1]["text"] += f" {ln_text}"
+                    for seg in segments:
+                        if FIGURE_CAPTION_PATTERN.match(seg["text"]):
+                            figure_captions.append(seg)
+                        else:
+                            table_captions.append(seg)
 
-            active_heading = " — ".join(page_headings) if page_headings else None
+            page_heading_texts = [h["text"] for h in page_headings]
+            page_heading_context = (
+                " — ".join(page_heading_texts) if page_heading_texts else _join_heading_state(carried_headings)
+            )
 
-            # 2. Detect Table Regions via pdfplumber (or PyMuPDF fallback)
+            def region_context(rect: fitz.Rect, caption: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+                heading = _heading_at(rect.y0, carried_headings, page_headings)
+                variant = (
+                    _extract_model_variant(caption or "")
+                    or _extract_model_variant(heading or "")
+                    or page_model_variant
+                )
+                return heading, variant
+
+            # 2. Detect Table Regions via configured backend (pdfplumber default, PyMuPDF optional)
             p_page = pdoc.pages[page_idx]
-            found_tables = p_page.find_tables()
+            found_tables = _find_tables(p_page, page, cfg.extract.table_backend)
             table_rects: list[fitz.Rect] = []
             page_candidates: list[dict[str, Any]] = []
 
-            for t_idx, tbl in enumerate(found_tables):
-                tx0, ty0, tx1, ty1 = tbl.bbox
+            for t_idx, (t_bbox, extracted_rows) in enumerate(found_tables):
+                tx0, ty0, tx1, ty1 = t_bbox
                 t_rect = fitz.Rect(tx0, ty0, tx1, ty1)
                 table_rects.append(t_rect)
 
-                # Find nearest table caption within margin above or below
-                best_cap: Optional[str] = None
-                best_dist = 9999.0
-                for cap in table_captions:
-                    c_rect: fitz.Rect = cap["rect"]
-                    dist = min(abs(t_rect.y0 - c_rect.y1), abs(c_rect.y0 - t_rect.y1))
-                    if dist <= cfg.extract.caption_search_margin_pt and dist < best_dist:
-                        best_dist = dist
-                        best_cap = cap["text"]
+                best_cap = _match_caption(t_rect, table_captions, cfg.extract.caption_search_margin_pt)
+                heading, variant = region_context(t_rect, best_cap)
 
-                extracted_rows = tbl.extract() or []
                 clean_rows: list[list[str]] = []
                 for row in extracted_rows:
                     if not row:
@@ -246,47 +349,67 @@ def parse_and_route_pdf(
                         "region_type": "table",
                         "bbox": (float(tx0), float(ty0), float(tx1), float(ty1)),
                         "raw_text": best_cap or "",
-                        "heading_context": active_heading,
+                        "heading_context": heading,
                         "nearby_caption": best_cap,
-                        "model_variant": _extract_model_variant(best_cap or "") or page_model_variant,
+                        "model_variant": variant,
                         "meta": {"rows": clean_rows, "table_index": t_idx},
                     }
                 )
 
-            # 3. Detect Figure Regions (pass all candidate image regions to Stage 2 for size/aspect filtering)
+            # 3. Detect Figure Regions: embedded raster images + clustered vector drawings (schematics).
+            # All candidates go to Stage 2 for size/aspect filtering of rules and icons.
+            figure_candidates: list[tuple[fitz.Rect, dict[str, Any]]] = []
             for img_idx, img_info in enumerate(page.get_image_info(xrefs=True)):
                 ibbox = img_info.get("bbox")
                 if not ibbox:
                     continue
-                ix0, iy0, ix1, iy1 = ibbox
-                i_rect = fitz.Rect(ix0, iy0, ix1, iy1)
+                i_rect = fitz.Rect(ibbox)
+                if any(_rect_iou(i_rect, prev) >= DUPLICATE_FIGURE_IOU for prev, _ in figure_candidates):
+                    continue
+                figure_candidates.append(
+                    (i_rect, {"source": "raster", "xref": img_info.get("xref", 0), "figure_index": img_idx})
+                )
 
-                # Match closest figure caption within search margin
-                best_fcap: Optional[str] = None
-                best_fdist = 9999.0
-                for cap in figure_captions:
-                    c_rect = cap["rect"]
-                    dist = min(abs(i_rect.y1 - c_rect.y0), abs(c_rect.y1 - i_rect.y0))
-                    if dist <= cfg.extract.caption_search_margin_pt and dist < best_fdist:
-                        best_fdist = dist
-                        best_fcap = cap["text"]
+            page_area = max(1.0, page.rect.width * page.rect.height)
+            for v_rect in page.cluster_drawings():
+                v_rect = fitz.Rect(v_rect)
+                if (v_rect.width * v_rect.height) / page_area > MAX_VECTOR_FIGURE_PAGE_COVERAGE:
+                    continue
+                # Table grid lines are drawings too; those are already routed as tables
+                if any(_rect_overlap_ratio(v_rect, tr) > 0.50 for tr in table_rects):
+                    continue
+                if any(_rect_iou(v_rect, prev) >= DUPLICATE_FIGURE_IOU for prev, _ in figure_candidates):
+                    continue
+                figure_candidates.append(
+                    (v_rect, {"source": "vector", "xref": 0, "figure_index": len(figure_candidates)})
+                )
+
+            for f_rect, f_meta in figure_candidates:
+                best_fcap = _match_caption(f_rect, figure_captions, cfg.extract.caption_search_margin_pt)
+                heading, variant = region_context(f_rect, best_fcap)
+                labels = [
+                    " ".join(tb["text"].split())
+                    for tb in text_blocks
+                    if _rect_overlap_ratio(tb["rect"], f_rect) > 0.50
+                ]
+                if labels:
+                    f_meta["figure_labels"] = labels
 
                 page_candidates.append(
                     {
-                        "y0": float(iy0),
-                        "x0": float(ix0),
+                        "y0": float(f_rect.y0),
+                        "x0": float(f_rect.x0),
                         "region_type": "figure",
-                        "bbox": (float(ix0), float(iy0), float(ix1), float(iy1)),
+                        "bbox": (float(f_rect.x0), float(f_rect.y0), float(f_rect.x1), float(f_rect.y1)),
                         "raw_text": best_fcap or "",
-                        "heading_context": active_heading,
+                        "heading_context": heading,
                         "nearby_caption": best_fcap,
-                        "model_variant": _extract_model_variant(best_fcap or "") or page_model_variant,
-                        "meta": {"xref": img_info.get("xref", 0), "figure_index": img_idx},
+                        "model_variant": variant,
+                        "meta": f_meta,
                     }
                 )
 
             # 4. Collect Prose Text Regions (excluding blocks inside table bboxes or standalone figure/table captions)
-            caption_texts = {c["text"] for c in figure_captions} | {c["text"] for c in table_captions}
             prose_lines: list[str] = []
             prose_rects: list[fitz.Rect] = []
 
@@ -295,7 +418,7 @@ def parse_and_route_pdf(
                 single_line = " ".join(tb["text"].split())
                 if any(_rect_overlap_ratio(tb_rect, tr) > 0.50 for tr in table_rects):
                     continue
-                if single_line in caption_texts:
+                if tb.get("is_caption"):
                     continue
                 prose_lines.append(single_line)
                 prose_rects.append(tb_rect)
@@ -316,12 +439,17 @@ def parse_and_route_pdf(
                             float(union_rect.y1),
                         ),
                         "raw_text": "\n".join(prose_lines),
-                        "heading_context": active_heading,
+                        "heading_context": page_heading_context,
                         "nearby_caption": None,
                         "model_variant": page_model_variant,
                         "meta": {},
                     }
                 )
+
+            for h in page_headings:
+                if h["level"] == 1:
+                    carried_headings = {}
+                carried_headings[h["level"]] = h["text"]
 
             # Sort all regions on the page in deterministic reading order
             page_candidates.sort(key=lambda c: (round(c["y0"], 1), round(c["x0"], 1)))
