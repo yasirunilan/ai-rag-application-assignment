@@ -1,15 +1,19 @@
-"""Swappable Local Text Embedder (Person 4 · Story E0.1 & E4.1).
+"""Swappable Local Text Embedder (Person 4 · Stories E0.1, E4.1 & E4.2).
 
 Supports:
 1. `fastembed` local ONNX model (`BAAI/bge-small-en-v1.5`) when installed and cached.
 2. `DeterministicSemanticEmbedder` (384-d L2-normalized) for zero-network offline execution (`smoke`).
+
+Every embedder exposes a stable `model_id`. The index records it at build time and refuses
+to be queried by a different embedder (Story E4.2: "vectors are never mixed").
 """
 
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
-from typing import Protocol
+from typing import Iterator, Protocol, Sequence
 
 import numpy as np
 
@@ -38,12 +42,25 @@ SEMANTIC_CLUSTERS: list[set[str]] = [
 
 PART_CODE_REGEX = re.compile(r"\b(?:AN|MS|NAS|FAULT|PIN|CB|SK)[A-Z0-9-]{2,}\b", re.IGNORECASE)
 
+# Story E4.1: embed searchable texts in batches of 16
+EMBED_BATCH_SIZE = 16
+
+logger = logging.getLogger(__name__)
+
 
 class EmbedderProtocol(Protocol):
     dim: int
+    model_id: str
 
     def embed_texts(self, texts: list[str]) -> np.ndarray:
         ...
+
+
+def iter_batches(texts: Sequence[str], batch_size: int = EMBED_BATCH_SIZE) -> Iterator[list[str]]:
+    """Yields consecutive slices of `texts` of at most `batch_size` items."""
+    size = max(1, int(batch_size))
+    for start in range(0, len(texts), size):
+        yield list(texts[start : start + size])
 
 
 class DeterministicSemanticEmbedder:
@@ -54,8 +71,15 @@ class DeterministicSemanticEmbedder:
     into a shared identifier subspace (which Story E5.2's BM25 fusion then disambiguates).
     """
 
-    def __init__(self, dim: int = 384) -> None:
+    # Bump the version suffix whenever the encoding below changes, so stale indexes are refused.
+    MODEL_FAMILY = "deterministic-semantic-hash-v1"
+
+    def __init__(self, dim: int = 384, batch_size: int = EMBED_BATCH_SIZE) -> None:
+        if dim <= 48:
+            raise ValueError(f"DeterministicSemanticEmbedder needs dim > 48 (got {dim})")
         self.dim = dim
+        self.batch_size = batch_size
+        self.model_id = f"{self.MODEL_FAMILY}-{dim}d"
 
     def _encode_one(self, text: str) -> np.ndarray:
         vec = np.zeros(self.dim, dtype=np.float32)
@@ -108,29 +132,54 @@ class DeterministicSemanticEmbedder:
     def embed_texts(self, texts: list[str]) -> np.ndarray:
         if not texts:
             return np.zeros((0, self.dim), dtype=np.float32)
-        return np.vstack([self._encode_one(t) for t in texts]).astype(np.float32)
+        out: list[np.ndarray] = []
+        for batch in iter_batches(texts, self.batch_size):
+            out.extend(self._encode_one(t or "") for t in batch)
+        return np.vstack(out).astype(np.float32)
 
 
 class FastEmbedWrapper:
     """Wrapper around `fastembed.TextEmbedding` (e.g. `BAAI/bge-small-en-v1.5`)."""
 
-    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5", dim: int = 384) -> None:
+    def __init__(
+        self,
+        model_name: str = "BAAI/bge-small-en-v1.5",
+        dim: int = 384,
+        batch_size: int = EMBED_BATCH_SIZE,
+    ) -> None:
         from fastembed import TextEmbedding
 
         self._model = TextEmbedding(model_name=model_name)
-        self.dim = dim
+        self.model_name = model_name
+        self.batch_size = batch_size
+        self.model_id = f"fastembed:{model_name}"
+        # Trust the model's real output width over the configured one
+        probe = np.asarray(next(iter(self._model.embed(["dimension probe"]))), dtype=np.float32)
+        if probe.shape[-1] != dim:
+            logger.warning(
+                "Configured embedding_dim=%d but %s produces %d-d vectors; using %d.",
+                dim, model_name, probe.shape[-1], probe.shape[-1],
+            )
+        self.dim = int(probe.shape[-1])
 
     def embed_texts(self, texts: list[str]) -> np.ndarray:
         if not texts:
             return np.zeros((0, self.dim), dtype=np.float32)
-        vecs = np.vstack(list(self._model.embed(texts))).astype(np.float32)
+        safe = [t if t and t.strip() else " " for t in texts]
+        vecs = np.vstack(
+            list(self._model.embed(safe, batch_size=self.batch_size))
+        ).astype(np.float32)
         norms = np.linalg.norm(vecs, axis=1, keepdims=True)
         norms = np.where(norms > 1e-8, norms, 1.0)
         return vecs / norms
 
 
 def create_embedder(cfg: AppConfig, force_offline: bool = False) -> EmbedderProtocol:
-    """Instantiates the configured local embedder with automatic offline fallback."""
+    """Instantiates the configured local embedder with automatic offline fallback.
+
+    The fallback is logged loudly: an index built by the fallback embedder records the
+    deterministic `model_id`, so it will refuse to be queried by fastembed later (and vice versa).
+    """
     if force_offline or cfg.index.embedding_provider == "deterministic_hash":
         return DeterministicSemanticEmbedder(dim=cfg.index.embedding_dim)
 
@@ -139,5 +188,10 @@ def create_embedder(cfg: AppConfig, force_offline: bool = False) -> EmbedderProt
             model_name=cfg.index.embedding_model_name,
             dim=cfg.index.embedding_dim,
         )
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 - missing package, no network, bad model name
+        logger.warning(
+            "fastembed model %r unavailable (%s: %s); falling back to the offline "
+            "DeterministicSemanticEmbedder. Install with: pip install -e '.[fastembed]'",
+            cfg.index.embedding_model_name, type(exc).__name__, exc,
+        )
         return DeterministicSemanticEmbedder(dim=cfg.index.embedding_dim)
