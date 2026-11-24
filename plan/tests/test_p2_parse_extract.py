@@ -207,3 +207,72 @@ def test_e2_3_spotcheck_rejects_broken_provenance(lab_cfg: AppConfig) -> None:
         report = run_provenance_spotcheck([bad], sample_size=1)
         assert report["passed"] is False
         assert report["samples"][0]["status"].startswith(expected)
+
+
+def _png_bytes(size: tuple[int, int] = (400, 200), mode: str = "RGB") -> bytes:
+    import io
+
+    from PIL import Image, ImageDraw
+
+    img = Image.new(mode, size, color=(240, 240, 250, 255) if mode == "RGBA" else (240, 240, 250))
+    ImageDraw.Draw(img).rectangle([10, 10, size[0] - 10, size[1] - 10], outline=(20, 40, 80), width=4)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _build_raster_cases_pdf(path: Path) -> Path:
+    """One page per E2.1 export case: clean raster, labelled raster, leader-lined raster, rotated, RGBA."""
+    doc = fitz.open()
+    box = fitz.Rect(60, 120, 460, 320)  # 400 x 200 pt
+
+    clean = doc.new_page()
+    clean.insert_image(box, stream=_png_bytes())
+
+    labelled = doc.new_page()
+    labelled.insert_image(box, stream=_png_bytes())
+    labelled.insert_text((150, 220), "P/N AN4-12A", fontsize=10)  # callout drawn over the image
+
+    leadered = doc.new_page()
+    leadered.insert_image(box, stream=_png_bytes())
+    leadered.draw_line((100, 150), (300, 280), width=1.5)  # leader line over the image
+
+    rotated = doc.new_page()
+    rotated.insert_image(fitz.Rect(60, 120, 260, 520), stream=_png_bytes(), rotate=90)
+
+    alpha = doc.new_page()
+    alpha.insert_image(box, stream=_png_bytes(mode="RGBA"))
+
+    doc.save(str(path))
+    doc.close()
+    return path
+
+
+def test_e2_1_exports_embedded_raster_where_possible(lab_cfg: AppConfig, tmp_path: Path) -> None:
+    """Story E2.1: export the embedded raster where possible, else render the bbox (labels must survive)."""
+    pdf = _build_raster_cases_pdf(tmp_path / "raster_cases.pdf")
+    _, regions = parse_and_route_pdf(pdf, lab_cfg)
+    fig_units, _ = extract_figure_units(regions, lab_cfg)
+    by_page = {u.provenance.page: u.provenance.extraction_meta for u in fig_units}
+    assert len(fig_units) == 5  # leader line on page 3 is not a second figure
+    assert sorted(by_page) == [1, 2, 3, 4, 5]
+
+    clean = by_page[1]
+    assert clean["export_method"] == "embedded_raster"
+    assert clean["export_fallback_reason"] is None
+    assert (clean["width_px"], clean["height_px"]) == (400, 200)  # native pixels, not a re-render
+    assert clean["dpi"] == 72
+
+    assert by_page[2]["export_method"] == "rendered_bbox"
+    assert by_page[2]["export_fallback_reason"] == "text_overlay"
+    assert by_page[3]["export_fallback_reason"] == "vector_overlay"
+    assert by_page[4]["export_fallback_reason"] == "rotated_or_flipped"
+    assert by_page[2]["dpi"] == lab_cfg.extract.figure_render_dpi
+
+    rgba = by_page[5]
+    assert rgba["export_method"] == "embedded_raster"
+    assert (rgba["width_px"], rgba["height_px"]) == (400, 200)
+
+    for u in fig_units:
+        pix = fitz.Pixmap(str(u.artefact))  # every export is a readable PNG on disk
+        assert pix.width == u.provenance.extraction_meta["width_px"]
