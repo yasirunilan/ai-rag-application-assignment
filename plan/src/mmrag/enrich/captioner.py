@@ -10,11 +10,15 @@ Also implements the fix for Appendix Failure Mode #5 ("Right text, wrong figure"
 from __future__ import annotations
 
 import base64
+import io
 import json
 import os
+import time
+import urllib.error
 import urllib.request
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from mmrag.config import AppConfig, BillingGuardError
 from mmrag.enrich.cache import CaptionCache
@@ -38,17 +42,63 @@ def assert_free_model_id(model_id: str, enforce_free_only: bool = True) -> None:
         )
 
 
+# Free-tier reality (brief §6): 20 requests/minute, intermittent endpoints, retired slugs.
+MIN_SECONDS_BETWEEN_CALLS = 3.1   # stays under 20 requests a minute
+MAX_ATTEMPTS_PER_MODEL = 3        # transient failures (429 / 5xx / timeout) retried with backoff
+BACKOFF_BASE_SECONDS = 2.0
+MAX_IMAGE_SIDE_PX = 1600          # downscale before sending (brief Stage 5)
+CAPTION_MAX_TOKENS = 400          # generous so a reasoning model cannot starve the visible caption
+REQUEST_TIMEOUT_SECONDS = 30
+
+_last_call_at: float = 0.0
+
+
+def _throttle(sleep: Callable[[float], None], clock: Callable[[], float]) -> None:
+    """Spaces consecutive OpenRouter calls so the free-tier per-minute cap is not hit."""
+    global _last_call_at
+    wait = MIN_SECONDS_BETWEEN_CALLS - (clock() - _last_call_at)
+    if _last_call_at and wait > 0:
+        sleep(wait)
+    _last_call_at = clock()
+
+
+def _downscale_png(image_bytes: bytes, max_side: int = MAX_IMAGE_SIDE_PX) -> bytes:
+    """Shrinks the image so its long side is at most `max_side` px; returns original on any problem."""
+    try:
+        from PIL import Image
+
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            if max(img.size) <= max_side:
+                return image_bytes
+            img = img.convert("RGB")
+            img.thumbnail((max_side, max_side))
+            out = io.BytesIO()
+            img.save(out, format="PNG")
+            return out.getvalue()
+    except Exception:
+        return image_bytes
+
+
 def _call_openrouter_free_vision(
     image_bytes: bytes,
     prompt: str,
     cfg: AppConfig,
+    errors: Optional[list[str]] = None,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
 ) -> Optional[str]:
-    """Calls OpenRouter `:free` vision models with automatic fallback rotation."""
+    """Calls OpenRouter `:free` vision models, rotating through the configured fallbacks.
+
+    Retries transient failures with exponential backoff, treats a 404 as a retired slug, treats
+    an empty caption as a failure of that model, and records every problem (naming the model)
+    in `errors` instead of swallowing it.
+    """
     api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     if not api_key or cfg.enrich.vision_provider != "openrouter_free":
         return None
+    errs = errors if errors is not None else []
 
-    b64_img = base64.b64encode(image_bytes).decode("ascii")
+    b64_img = base64.b64encode(_downscale_png(image_bytes)).decode("ascii")
     for model_id in cfg.enrich.openrouter_models:
         assert_free_model_id(model_id, cfg.enrich.enforce_free_only)
         payload = {
@@ -65,31 +115,44 @@ def _call_openrouter_free_vision(
                     ],
                 }
             ],
-            "max_tokens": 220,
+            "max_tokens": CAPTION_MAX_TOKENS,
+            "reasoning": {"enabled": False},  # plain captioning needs no thinking tokens
         }
-        req = urllib.request.Request(
-            "https://openrouter.ai/api/v1/chat/completions",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://localhost/mmrag-lab-a",
-            },
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                body = json.loads(resp.read().decode("utf-8"))
+        for attempt in range(MAX_ATTEMPTS_PER_MODEL):
+            _throttle(sleep, clock)
+            req = urllib.request.Request(
+                "https://openrouter.ai/api/v1/chat/completions",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://localhost/mmrag-lab-a",
+                },
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_SECONDS) as resp:
+                    body = json.loads(resp.read().decode("utf-8"))
                 content = (
-                    body.get("choices", [{}])[0]
-                    .get("message", {})
-                    .get("content", "")
-                    .strip()
-                )
+                    (body.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+                ).strip()
                 if content:
                     return content
-        except Exception:
-            continue
+                errs.append(f"{model_id}: empty caption (reasoning budget or empty reply)")
+                break  # try the next model
+            except urllib.error.HTTPError as exc:
+                if exc.code == 404:
+                    errs.append(f"{model_id}: 404 no endpoints found (slug retired)")
+                    break
+                if exc.code == 429 or exc.code >= 500:
+                    errs.append(f"{model_id}: HTTP {exc.code} (attempt {attempt + 1})")
+                    sleep(BACKOFF_BASE_SECONDS * (2 ** attempt))
+                    continue
+                errs.append(f"{model_id}: HTTP {exc.code}")
+                break
+            except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+                errs.append(f"{model_id}: {type(exc).__name__} (attempt {attempt + 1})")
+                sleep(BACKOFF_BASE_SECONDS * (2 ** attempt))
     return None
 
 
@@ -155,23 +218,41 @@ def _local_vision_or_heuristic_caption(
     return " | ".join(p for p in parts if p)
 
 
-def enrich_figure_units(
+@dataclass
+class FigureEnrichmentResult:
+    units: list[Unit]
+    cache: CaptionCache
+    remote_calls: int = 0           # figures that needed a real model call (cache misses)
+    fallback_used: int = 0          # figures captioned by the offline fixture
+    errors: list[str] = field(default_factory=list)  # model-named failures from OpenRouter
+
+
+def enrich_figures(
     units: list[Unit],
     cfg: AppConfig,
     cache: Optional[CaptionCache] = None,
-) -> tuple[list[Unit], CaptionCache]:
-    """Populates `search_text` on every figure Unit using cached vision captioning (Story E3.1)."""
+) -> FigureEnrichmentResult:
+    """Populates `search_text` on every figure Unit using cached vision captioning (Story E3.1).
+
+    Offline captions come from a deterministic fixture (`_local_vision_or_heuristic_caption`),
+    not a real vision model; they are tagged `local_fallback` in the cache and are ignored
+    once a real key is configured, so they never masquerade as model output.
+    """
     cap_cache = cache or CaptionCache(cfg.project.cache_dir, enabled=cfg.enrich.cache_enabled)
 
     # Validate configured OpenRouter models upfront against :free guard
     if cfg.enrich.vision_provider == "openrouter_free":
         for m in cfg.enrich.openrouter_models:
             assert_free_model_id(m, cfg.enrich.enforce_free_only)
+    remote_available = (
+        cfg.enrich.vision_provider == "openrouter_free"
+        and bool(os.environ.get("OPENROUTER_API_KEY", "").strip())
+    )
 
-    enriched: list[Unit] = []
+    result = FigureEnrichmentResult(units=[], cache=cap_cache)
     for u in units:
         if u.type != "figure":
-            enriched.append(u)
+            result.units.append(u)
             continue
 
         img_path = Path(str(u.artefact))
@@ -186,12 +267,25 @@ def enrich_figure_units(
         )
         cache_key = cap_cache.compute_key(img_bytes, f"{context_mode}::{context_hint}")
 
-        cached_entry = cap_cache.get(cache_key)
-        if cached_entry and cached_entry.get("search_text"):
-            caption_text = str(cached_entry["search_text"])
+        entry = cap_cache.peek(cache_key)
+        if entry and entry.get("provider") == "local_fallback" and remote_available:
+            cap_cache.record_miss()  # stale offline caption: redo with the real model
+            entry = None
+        elif entry:
+            cap_cache.get(cache_key)  # counts the hit
+        else:
+            cap_cache.get(cache_key)  # counts the miss
+
+        if entry:
+            caption_text = str(entry["search_text"])
         else:
             prompt = SEARCH_PROMPT_TEMPLATE.format(context_hint=context_hint)
-            remote_caption = _call_openrouter_free_vision(img_bytes, prompt, cfg)
+            remote_caption = None
+            if img_bytes:
+                result.remote_calls += 1 if remote_available else 0
+                remote_caption = _call_openrouter_free_vision(
+                    img_bytes, prompt, cfg, errors=result.errors
+                )
             if remote_caption:
                 if cfg.enrich.include_nearby_context:
                     caption_text = (
@@ -209,6 +303,7 @@ def enrich_figure_units(
                     include_nearby_context=cfg.enrich.include_nearby_context,
                 )
                 provider_used = "local_fallback"
+                result.fallback_used += 1
 
             cap_cache.set(
                 cache_key,
@@ -221,7 +316,16 @@ def enrich_figure_units(
                 },
             )
 
-        updated = u.model_copy(update={"search_text": caption_text})
-        enriched.append(updated)
+        result.units.append(u.model_copy(update={"search_text": caption_text}))
 
-    return enriched, cap_cache
+    return result
+
+
+def enrich_figure_units(
+    units: list[Unit],
+    cfg: AppConfig,
+    cache: Optional[CaptionCache] = None,
+) -> tuple[list[Unit], CaptionCache]:
+    """Backwards-compatible wrapper used by the pipeline: returns (units, cache)."""
+    res = enrich_figures(units, cfg, cache)
+    return res.units, res.cache
