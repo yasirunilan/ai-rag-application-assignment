@@ -380,6 +380,12 @@ def parse_and_route_pdf(
                     continue
                 if any(_rect_iou(v_rect, prev) >= DUPLICATE_FIGURE_IOU for prev, _ in figure_candidates):
                     continue
+                # Leader lines / callouts drawn over a raster belong to that image, not a second figure
+                if any(
+                    m["source"] == "raster" and _rect_overlap_ratio(v_rect, prev) > 0.50
+                    for prev, m in figure_candidates
+                ):
+                    continue
                 figure_candidates.append(
                     (v_rect, {"source": "vector", "xref": 0, "figure_index": len(figure_candidates)})
                 )

@@ -1,8 +1,8 @@
 """Figure Extraction & Rule/Icon Filtering (Person 2 · Story E2.1).
 
-Exports the cropped figure image to disk, stamps `doc -> page -> figure_id`, bbox,
-and nearby caption text on the Unit, and filters out decorative rules/icons below
-the minimum geometry gate.
+Exports the original embedded raster where possible (else renders the bbox at
+`figure_render_dpi`), stamps `doc -> page -> figure_id`, bbox, and nearby caption text
+on the Unit, and filters out decorative rules/icons below the minimum geometry gate.
 """
 
 from __future__ import annotations
@@ -37,6 +37,83 @@ def is_valid_figure_bbox(
         return False, f"aspect_ratio_out_of_bounds ({aspect:.2f})"
 
     return True, "ok"
+
+
+TRANSFORM_TOL = 1e-3
+# Fraction of the figure bbox a placement may differ by and still count as the whole image.
+PLACEMENT_TOL = 0.02
+# Drawings this close to the figure edge are treated as frames/borders, not overlays.
+OVERLAY_EDGE_MARGIN_PT = 2.0
+
+
+def _find_placement(page: fitz.Page, xref: int, bbox: fitz.Rect) -> dict | None:
+    """The `get_image_info` entry for this xref drawn at this bbox (an xref can be placed several times)."""
+    tol = PLACEMENT_TOL * max(bbox.width, bbox.height)
+    for info in page.get_image_info(xrefs=True):
+        if info.get("xref") != xref:
+            continue
+        r = fitz.Rect(info["bbox"])
+        if all(abs(a - b) <= tol for a, b in zip(r, bbox)):
+            return info
+    return None
+
+
+def _has_overlay(page: fitz.Page, img_rect: fitz.Rect) -> str | None:
+    """Text or vector strokes drawn on top of the image would be lost by exporting the raw raster."""
+    inner = fitz.Rect(img_rect) + (OVERLAY_EDGE_MARGIN_PT, OVERLAY_EDGE_MARGIN_PT, -OVERLAY_EDGE_MARGIN_PT, -OVERLAY_EDGE_MARGIN_PT)
+    if inner.is_empty:
+        return None
+    for x0, y0, x1, y1, text, *_ in page.get_text("blocks"):
+        if text.strip() and fitz.Rect(x0, y0, x1, y1).intersects(inner):
+            return "text_overlay"
+    for d in page.get_drawings():
+        d_rect = fitz.Rect(d["rect"])
+        # A frame drawn around the image only touches it at the edges
+        if d_rect.intersects(inner) and not d_rect.contains(img_rect):
+            return "vector_overlay"
+    return None
+
+
+def _try_embedded_raster(
+    doc: fitz.Document,
+    page: fitz.Page,
+    reg: RawRegion,
+    clip_rect: fitz.Rect,
+) -> tuple[fitz.Pixmap | None, str | None]:
+    """Returns the original embedded image as an RGB(A) pixmap, or `(None, reason)` to render the bbox instead.
+
+    Falls back whenever the raw raster would not match what the page shows: vector figures,
+    images placed rotated/flipped or cropped by the page edge, and labels or leader lines drawn on top.
+    """
+    xref = int(reg.meta.get("xref", 0) or 0)
+    if reg.meta.get("source", "raster") != "raster" or xref <= 0:
+        return None, "not_embedded_raster"
+    if clip_rect != fitz.Rect(*reg.bbox):
+        return None, "cropped_by_page"
+
+    placement = _find_placement(page, xref, clip_rect)
+    if placement is None:
+        return None, "placement_not_found"
+    a, b, c, d, _, _ = placement.get("transform", (1, 0, 0, 1, 0, 0))
+    if abs(b) > TRANSFORM_TOL or abs(c) > TRANSFORM_TOL or a <= 0 or d <= 0:
+        return None, "rotated_or_flipped"
+
+    overlay = _has_overlay(page, clip_rect)
+    if overlay:
+        return None, overlay
+
+    try:
+        pix = fitz.Pixmap(doc, xref)
+        smask = doc.extract_image(xref).get("smask", 0)
+        if smask:
+            pix = fitz.Pixmap(pix, fitz.Pixmap(doc, smask))
+        if pix.colorspace is None:  # stencil/image mask: no colour data to export
+            return None, "no_colorspace"
+        if pix.colorspace.n not in (1, 3):  # CMYK, Lab, indexed... -> PNG-safe RGB
+            pix = fitz.Pixmap(fitz.csRGB, pix)
+    except Exception as exc:  # corrupt or unsupported image stream
+        return None, f"extract_failed ({type(exc).__name__})"
+    return pix, None
 
 
 def extract_figure_units(
@@ -90,7 +167,15 @@ def extract_figure_units(
                 per_page_seq[key] = seq
                 unit_id = f"{reg.doc_id}__p{reg.page:04d}__figure_{seq:03d}"
 
-                pix = page.get_pixmap(clip=clip_rect, dpi=cfg.extract.figure_render_dpi)
+                # Story E2.1: export the embedded raster where possible, else render the bbox
+                pix, fallback_reason = _try_embedded_raster(doc, page, reg, clip_rect)
+                if pix is not None:
+                    export_method = "embedded_raster"
+                    effective_dpi = round(pix.width / max(1e-6, clip_rect.width / 72.0))
+                else:
+                    export_method = "rendered_bbox"
+                    pix = page.get_pixmap(clip=clip_rect, dpi=cfg.extract.figure_render_dpi)
+                    effective_dpi = cfg.extract.figure_render_dpi
                 img_path = out_dir / f"{unit_id}.png"
                 pix.save(str(img_path))
 
@@ -107,7 +192,9 @@ def extract_figure_units(
                         "figure_source": reg.meta.get("source", "raster"),
                         "figure_labels": reg.meta.get("figure_labels", []),
                         "xref": reg.meta.get("xref", 0),
-                        "dpi": cfg.extract.figure_render_dpi,
+                        "export_method": export_method,
+                        "export_fallback_reason": fallback_reason,
+                        "dpi": effective_dpi,
                         "width_px": pix.width,
                         "height_px": pix.height,
                     },
