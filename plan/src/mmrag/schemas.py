@@ -167,6 +167,13 @@ class AnswerResponse(BaseModel):
     grounded_caption: Optional[str] = None
     source_unit: Optional[Unit] = None
     top_hits: list[SearchHit] = Field(default_factory=list)
+    # Story E6.1 / E6.2 additions (all optional, backward compatible)
+    abstain_code: Optional[str] = None            # stable machine-readable reason (see answer.responder)
+    citation_path: Optional[str] = None           # "doc_id > p.N > unit_id"
+    grounded_answer: Optional[str] = None         # extractive answer quoting the cited unit, citation inline
+    matched_rows: list[int] = Field(default_factory=list)  # table answers: indices of rows that answer the query
+    query_term_coverage: Optional[float] = None   # share of query terms found in the cited unit
+    dropped_hits: list[dict[str, Any]] = Field(default_factory=list)  # unsourced hits removed, with reason
 
 
 class GoldQuestion(BaseModel):
@@ -190,6 +197,10 @@ class TypeMetrics(BaseModel):
     page_mrr: float
     strict_recall_at_k: float
     strict_mrr: float
+    # Story E7.1 additions: recall at several cut-offs and precision@k
+    page_recall_at: dict[int, float] = Field(default_factory=dict)
+    strict_recall_at: dict[int, float] = Field(default_factory=dict)
+    strict_precision_at_k: float = 0.0
 
 
 class EvalReport(BaseModel):
@@ -205,3 +216,8 @@ class EvalReport(BaseModel):
     faithfulness_pass_rate: Optional[float] = None
     faithfulness_details: list[dict[str, Any]] = Field(default_factory=list)
     config_snapshot: dict[str, Any] = Field(default_factory=dict)
+    # Story E7.1 / E7.2 additions
+    recall_cutoffs: list[int] = Field(default_factory=list)
+    per_question: list[dict[str, Any]] = Field(default_factory=list)   # so moved question IDs can be listed
+    latency_ms: dict[str, float] = Field(default_factory=dict)         # retrieval p50 / p95 (Layer C)
+    answer_quality: dict[str, Any] = Field(default_factory=dict)       # Layer B over the full gold set

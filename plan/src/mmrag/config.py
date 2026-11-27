@@ -137,6 +137,9 @@ class AnswerConfig(BaseModel):
     fail_closed_on_missing_provenance: bool = True
     min_score_threshold: float = 0.05
     promote_explicit_modality_intent: bool = True
+    # Story E6.2: fused scores are min-max normalized, so the top hit always scores high even for an
+    # off-topic question. Abstain unless this share of the query's terms appears in the cited unit.
+    min_query_term_coverage: float = 0.25
 
 
 class AppConfig(BaseModel):
