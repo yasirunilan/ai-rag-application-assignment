@@ -11,8 +11,8 @@ from mmrag.corpus.loader import load_corpus_manuals, load_gold_questions
 from mmrag.enrich.cache import CaptionCache
 from mmrag.enrich.captioner import enrich_figure_units
 from mmrag.enrich.table_linearizer import enrich_table_units
-from mmrag.eval.faithfulness import run_faithfulness_spotcheck
-from mmrag.eval.metrics import evaluate_retrieval_by_type
+from mmrag.eval.faithfulness import evaluate_answer_quality, run_faithfulness_spotcheck
+from mmrag.eval.metrics import evaluate_retrieval_by_type, save_eval_report
 from mmrag.extract.figures import extract_figure_units
 from mmrag.extract.spotcheck import run_provenance_spotcheck
 from mmrag.extract.tables import extract_table_units, extract_text_units
@@ -118,7 +118,8 @@ class MultimodalRAGPipeline:
         k: Optional[int] = None,
         save_report: bool = True,
     ) -> EvalReport:
-        """Runs Stage 7 per-type Recall@k & MRR evaluation + 5-sample faithfulness check."""
+        """Runs Stage 7: Layer A per-type retrieval metrics, Layer B answer quality and the
+        5-answer faithfulness check, saved as one report (`reports/<experiment_name>.json`)."""
         if self.retriever is None:
             raise RuntimeError("Pipeline has not been indexed yet.")
         questions = load_gold_questions(self.cfg, auto_seed=True)
@@ -133,13 +134,9 @@ class MultimodalRAGPipeline:
         faith = run_faithfulness_spotcheck(self.retriever, questions, self.cfg, sample_size=5)
         report.faithfulness_pass_rate = faith["faithfulness_pass_rate"]
         report.faithfulness_details = faith["reviews"]
+        report.answer_quality = evaluate_answer_quality(self.retriever, questions, self.cfg)
 
         if save_report:
-            import json
-
-            rep_dir = Path(self.cfg.project.reports_dir)
-            rep_dir.mkdir(parents=True, exist_ok=True)
-            out_path = rep_dir / f"{experiment_name}.json"
-            out_path.write_text(json.dumps(report.model_dump(), indent=2), encoding="utf-8")
+            save_eval_report(report, self.cfg)
 
         return report

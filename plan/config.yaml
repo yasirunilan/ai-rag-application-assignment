@@ -83,3 +83,4 @@ answer:
   fail_closed_on_missing_provenance: true
   min_score_threshold: 0.05
   promote_explicit_modality_intent: true  # Promotes co-retrieved figure/table on same page when query explicitly asks for diagram/table
+  min_query_term_coverage: 0.25       # Abstain ("nothing relevant retrieved") when the cited unit covers < 25% of query terms; 0 disables
