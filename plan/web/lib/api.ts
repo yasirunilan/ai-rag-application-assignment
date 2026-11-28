@@ -1,4 +1,4 @@
-import { ApiError, Example, Health, QueryResponse } from "./types";
+import { ApiError, Example, Health, QueryResponse, UnitType } from "./types";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
@@ -26,10 +26,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const getHealth = () => request<Health>("/health");
 export const getExamples = () => request<Example[]>("/examples");
-export const postQuery = (question: string) =>
+export const postQuery = (question: string, typeFilter?: UnitType | null) =>
   request<QueryResponse>("/query", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify(typeFilter ? { question, type_filter: typeFilter } : { question }),
   });
 export const artefactUrl = (path: string) => `${API_BASE}${path}`;

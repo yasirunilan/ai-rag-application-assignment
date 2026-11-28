@@ -156,6 +156,25 @@ def _call_openrouter_free_vision(
     return None
 
 
+def _call_local_vision_model(image_bytes: bytes, prompt: str, cfg: AppConfig) -> Optional[str]:
+    """Runs optional local Hugging Face vision model when `enrich.vision_provider == 'local_vision'`."""
+    if cfg.enrich.vision_provider != "local_vision" or not image_bytes:
+        return None
+    try:
+        from PIL import Image
+        from transformers import pipeline  # type: ignore[import-not-found]
+
+        pipe = pipeline("image-to-text", model=cfg.enrich.local_vision_model)
+        with Image.open(io.BytesIO(_downscale_png(image_bytes))) as img:
+            out = pipe(img.convert("RGB"), prompt=prompt, max_new_tokens=200)
+        if out and isinstance(out, list):
+            text = str(out[0].get("generated_text") or "").strip()
+            return text or None
+    except Exception:  # noqa: BLE001
+        return None
+    return None
+
+
 def _local_vision_or_heuristic_caption(
     unit: Unit,
     image_bytes: bytes,
@@ -282,10 +301,13 @@ def enrich_figures(
             prompt = SEARCH_PROMPT_TEMPLATE.format(context_hint=context_hint)
             remote_caption = None
             if img_bytes:
-                result.remote_calls += 1 if remote_available else 0
-                remote_caption = _call_openrouter_free_vision(
-                    img_bytes, prompt, cfg, errors=result.errors
-                )
+                if cfg.enrich.vision_provider == "local_vision":
+                    remote_caption = _call_local_vision_model(img_bytes, prompt, cfg)
+                else:
+                    result.remote_calls += 1 if remote_available else 0
+                    remote_caption = _call_openrouter_free_vision(
+                        img_bytes, prompt, cfg, errors=result.errors
+                    )
             if remote_caption:
                 if cfg.enrich.include_nearby_context:
                     caption_text = (
@@ -295,7 +317,7 @@ def enrich_figures(
                     )
                 else:
                     caption_text = remote_caption
-                provider_used = "openrouter_free"
+                provider_used = cfg.enrich.vision_provider
             else:
                 caption_text = _local_vision_or_heuristic_caption(
                     u,

@@ -19,10 +19,17 @@ export default function AnswerPanel({ answer, busy, error }: { answer: QueryResp
         <p>The system abstained rather than guess: <code>{answer.abstain_reason}</code></p>
       </div>
     );
+  const matched = new Set(answer.matched_rows ?? []);
   return (
     <div className="panel">
-      <div className="citation">Source: <strong>{answer.citation}</strong> · <code>{answer.unit_id}</code></div>
+      <div className="citation">
+        Source: <strong>{answer.citation}</strong>
+        {answer.citation_path ? <> · <code>{answer.citation_path}</code></> : answer.unit_id ? <> · <code>{answer.unit_id}</code></> : null}
+      </div>
       {answer.caption && <p className="caption">{answer.caption}</p>}
+      {answer.grounded_answer && answer.modality !== "text" && (
+        <p className="groundedAnswer">{answer.grounded_answer}</p>
+      )}
       {answer.modality === "figure" && answer.image_url && (
         // eslint-disable-next-line @next/next/no-img-element
         <img className="figure" src={artefactUrl(answer.image_url)} alt={answer.caption ?? "Retrieved figure"} />
@@ -31,11 +38,19 @@ export default function AnswerPanel({ answer, busy, error }: { answer: QueryResp
         <div className="tableWrap">
           <table>
             <thead><tr>{answer.table.headers.map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
-            <tbody>{answer.table.rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody>
+            <tbody>
+              {answer.table.rows.map((r, i) => (
+                <tr key={i} className={matched.has(i) ? "matchedRow" : ""}>
+                  {r.map((c, j) => <td key={j}>{c}</td>)}
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
       )}
-      {answer.modality === "text" && answer.text && <blockquote>{answer.text}</blockquote>}
+      {answer.modality === "text" && (answer.grounded_answer || answer.text) && (
+        <blockquote>{answer.grounded_answer ?? answer.text}</blockquote>
+      )}
     </div>
   );
 }

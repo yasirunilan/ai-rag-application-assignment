@@ -10,6 +10,7 @@ h1 { margin:0; font-size:24px; } h2 { margin:0 0 8px; font-size:16px; }
 .badge.good { color:var(--good); border-color:var(--good); } .badge.bad { color:var(--bad); border-color:var(--bad); }
 .queryForm { display:flex; gap:8px; }
 input { flex:1; padding:12px; font-size:16px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
+.typeSelect { padding:10px 12px; font-size:14px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
 button { padding:10px 16px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:#fff; font-size:15px; cursor:pointer; }
 button:disabled { opacity:.55; cursor:not-allowed; }
 .examples { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 18px; }
@@ -19,10 +20,12 @@ button:disabled { opacity:.55; cursor:not-allowed; }
 @media (max-width:800px) { .grid { grid-template-columns:1fr; } }
 .panel { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
 .errorPanel { border-color:var(--bad); } .abstain { border-color:var(--warn); }
-.citation { margin-bottom:6px; } .caption { margin:4px 0 12px; color:var(--muted); }
+.citation { margin-bottom:6px; } .caption { margin:4px 0 8px; color:var(--muted); }
+.groundedAnswer { margin:4px 0 12px; font-size:14px; padding:8px 10px; border-left:3px solid var(--accent); background:var(--bg); border-radius:4px; }
 .figure { max-width:100%; border:1px solid var(--line); border-radius:6px; background:#fff; }
 .tableWrap { overflow-x:auto; } table { border-collapse:collapse; width:100%; font-size:14px; }
 th,td { border:1px solid var(--line); padding:6px 8px; text-align:left; } th { background:var(--bg); }
+tr.matchedRow td { background:color-mix(in srgb,var(--good) 12%,transparent); font-weight:600; }
 blockquote { margin:0; padding-left:12px; border-left:3px solid var(--accent); }
 .sources { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
 .sources li { padding:8px; border:1px solid var(--line); border-radius:8px; } .sources li.cited { border-color:var(--good); background:color-mix(in srgb,var(--good) 8%,transparent); }

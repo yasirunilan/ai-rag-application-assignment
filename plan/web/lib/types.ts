@@ -21,10 +21,14 @@ export interface QueryResponse {
   question: string;
   abstained: boolean;
   abstain_reason?: string | null;
+  abstain_code?: string | null;
   modality?: UnitType | null;
   citation?: string | null;
+  citation_path?: string | null;
   unit_id?: string | null;
   caption?: string | null;
+  grounded_answer?: string | null;
+  matched_rows?: number[];
   image_url?: string | null;
   table?: TableData | null;
   text?: string | null;

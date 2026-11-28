@@ -5,7 +5,7 @@ import QueryBox from "@/components/QueryBox";
 import SourcesPanel from "@/components/SourcesPanel";
 import StatusBadge from "@/components/StatusBadge";
 import { getExamples, getHealth, postQuery } from "@/lib/api";
-import { ApiError, Example, Health, QueryResponse } from "@/lib/types";
+import { ApiError, Example, Health, QueryResponse, UnitType } from "@/lib/types";
 
 export default function Home() {
   const [health, setHealth] = useState<Health | null>(null);
@@ -23,10 +23,10 @@ export default function Home() {
     getExamples().then(setExamples).catch(() => setExamples([]));
   }, []);
 
-  async function ask(q: string) {
+  async function ask(q: string, typeFilter: UnitType | null = null) {
     setBusy(true); setError(null);
     try {
-      setAnswer(await postQuery(q));
+      setAnswer(await postQuery(q, typeFilter));
     } catch (e) {
       setAnswer(null);
       setError(e instanceof ApiError ? e : new ApiError("http", String(e)));

@@ -59,6 +59,7 @@ class ProjectConfig(BaseModel):
     data_dir: str = "data"
     artifacts_dir: str = "data/artifacts"
     cache_dir: str = "data/cache/captions"
+    embedding_cache_dir: str = "data/cache/embeddings"
     index_dir: str = "data/index"
     review_queue_path: str = "data/review_queue.jsonl"
     enrichment_rejects_path: str = "data/rejected_enrichment_units.jsonl"
@@ -161,7 +162,7 @@ class EnrichConfig(BaseModel):
 
 
 class IndexConfig(BaseModel):
-    embedding_provider: Literal["local_bge", "deterministic_hash"] = "local_bge"
+    embedding_provider: Literal["local_bge", "openrouter_free", "deterministic_hash"] = "local_bge"
     embedding_model_name: str = "BAAI/bge-small-en-v1.5"
     openrouter_embed_model: str = "nvidia/nemotron-3.5-embed-1b:free"
     embedding_dim: int = 384

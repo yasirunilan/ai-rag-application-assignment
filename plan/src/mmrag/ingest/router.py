@@ -11,6 +11,7 @@ Also documents and measures what a naive flat-text loader (`page.get_text("text"
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 from typing import Any, Optional
@@ -21,6 +22,26 @@ import pdfplumber
 from mmrag.config import AppConfig
 from mmrag.ingest.ocr_gate import evaluate_ocr_quality_gate, is_scanned_page, run_ocr_on_page
 from mmrag.schemas import PageClassification, RawRegion
+
+logger = logging.getLogger(__name__)
+
+
+def _try_docling_tables(pdf_path: Path) -> dict[int, list[list[list[str]]]]:
+    """Optional Docling table extractor when `ingest.parser_backend == 'docling'` (Story E1.1)."""
+    try:
+        from docling.document_converter import DocumentConverter  # type: ignore[import-not-found]
+    except ImportError:
+        logger.warning("parser_backend='docling' requested but docling is not installed; using PyMuPDF/pdfplumber.")
+        return {}
+    by_page: dict[int, list[list[list[str]]]] = {}
+    res = DocumentConverter().convert(str(pdf_path))
+    for tbl in getattr(res.document, "tables", ()):
+        prov = (getattr(tbl, "prov", None) or [None])[0]
+        pno = int(getattr(prov, "page_no", 1) or 1)
+        df = tbl.export_to_dataframe()
+        rows = [[str(c) for c in df.columns.tolist()], *[[str(v) for v in r] for r in df.values.tolist()]]
+        by_page.setdefault(pno, []).append(rows)
+    return by_page
 
 
 HEADING_PATTERN = re.compile(
@@ -184,6 +205,7 @@ def parse_and_route_pdf(
     regions: list[RawRegion] = []
     # Heading hierarchy carried from previous pages so continuation pages keep their section context
     carried_headings: dict[int, str] = {}
+    docling_tables = _try_docling_tables(path) if cfg.ingest.parser_backend == "docling" else {}
 
     with fitz.open(str(path)) as doc, pdfplumber.open(str(path)) as pdoc:
         for page_idx, page in enumerate(doc):
@@ -320,9 +342,14 @@ def parse_and_route_pdf(
                 )
                 return heading, variant
 
-            # 2. Detect Table Regions via configured backend (pdfplumber default, PyMuPDF optional)
+            # 2. Detect Table Regions via configured backend (pdfplumber default, PyMuPDF/Docling optional)
             p_page = pdoc.pages[page_idx]
             found_tables = _find_tables(p_page, page, cfg.extract.table_backend)
+            if not found_tables and page_num in docling_tables:
+                found_tables = [
+                    ((0.0, 0.0, float(page.rect.width), float(page.rect.height)), rows)
+                    for rows in docling_tables[page_num]
+                ]
             table_rects: list[fitz.Rect] = []
             page_candidates: list[dict[str, Any]] = []
 

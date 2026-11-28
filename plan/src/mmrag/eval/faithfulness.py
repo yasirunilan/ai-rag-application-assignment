@@ -82,6 +82,8 @@ def judge_answer(q: GoldQuestion, ans: AnswerResponse) -> dict[str, Any]:
         hint_ok = q.gold_artefact_hint.lower() in artefact_meta.lower()
 
     structure_ok = not (q.expected_type == "table" and not isinstance(ans.artefact, TableArtefact))
+    if q.expected_type == "figure" and isinstance(ans.artefact, str) and Path(ans.artefact).exists():
+        structure_ok = _is_valid_png_file(ans.artefact)
 
     visible = _answer_visible_text(ans).lower()
     keywords = q.expected_keywords

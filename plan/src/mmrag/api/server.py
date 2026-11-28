@@ -57,10 +57,14 @@ class QueryResponse(BaseModel):
     question: str
     abstained: bool
     abstain_reason: Optional[str] = None
+    abstain_code: Optional[str] = None
     modality: Optional[str] = None
     citation: Optional[str] = None
+    citation_path: Optional[str] = None
     unit_id: Optional[str] = None
     caption: Optional[str] = None
+    grounded_answer: Optional[str] = None
+    matched_rows: list[int] = Field(default_factory=list)
     image_url: Optional[str] = None           # figures: GET this to get the real image
     table: Optional[dict[str, Any]] = None    # tables: exact structured rows
     text: Optional[str] = None                # text answers: the supporting span
@@ -187,7 +191,7 @@ def create_app(cfg: Optional[AppConfig] = None, offline: Optional[bool] = None) 
                 status_code=502, detail={"kind": "upstream", "message": f"{type(exc).__name__}: {exc}"}
             ) from exc
         t1 = time.perf_counter()
-        ans = build_answer_from_hits(req.question, hits, cfg)
+        ans = build_answer_from_hits(req.question, hits, cfg, offline=state.offline)
         t2 = time.perf_counter()
         timings = {"retrieval": round((t1 - t0) * 1000, 2), "answer": round((t2 - t1) * 1000, 2),
                    "total": round((t2 - t0) * 1000, 2)}
@@ -195,12 +199,14 @@ def create_app(cfg: Optional[AppConfig] = None, offline: Optional[bool] = None) 
         if ans.abstained or ans.source_unit is None:
             return QueryResponse(
                 question=req.question, abstained=True, abstain_reason=ans.abstain_reason,
+                abstain_code=ans.abstain_code,
                 sources=_sources(ans.top_hits, None), timings_ms=timings,
             )
         u = ans.source_unit
         resp = QueryResponse(
             question=req.question, abstained=False, modality=u.type, citation=ans.citation,
-            unit_id=u.unit_id, caption=ans.grounded_caption,
+            citation_path=ans.citation_path, unit_id=u.unit_id, caption=ans.grounded_caption,
+            grounded_answer=ans.grounded_answer, matched_rows=ans.matched_rows,
             sources=_sources(ans.top_hits, u.unit_id), timings_ms=timings,
         )
         if u.type == "figure":

@@ -40,6 +40,25 @@ def test_table_question_returns_exact_structured_rows(client: TestClient) -> Non
     ).json()
     assert body["modality"] == "table" and isinstance(body["table"]["rows"], list)
     assert any("AN4-12A" in cell for row in body["table"]["rows"] for cell in row)
+    assert body["citation_path"] == "amt_handbook > p.1 > amt_handbook__p0001__table_001"
+    assert len(body["matched_rows"]) == 1
+    assert "AN4-12A" in body["table"]["rows"][body["matched_rows"][0]]
+    assert "AN4-12A" in (body["grounded_answer"] or "")
+    tbl_art = client.get(f"/artefact/{body['unit_id']}")
+    assert tbl_art.status_code == 200 and "headers" in tbl_art.json()
+
+
+def test_text_question_and_off_topic_abstention_via_api(client: TestClient) -> None:
+    txt = client.post(
+        "/query",
+        json={"question": "What nitrogen pre-charge pressure is required on the Model A320 hydraulic accumulator at 20 degrees Celsius?"},
+    ).json()
+    assert txt["modality"] == "text" and "1,450 PSI" in (txt["grounded_answer"] or "")
+    txt_art = client.get(f"/artefact/{txt['unit_id']}")
+    assert txt_art.status_code == 200 and "1,450 PSI" in txt_art.json()["text"]
+
+    off = client.post("/query", json={"question": "How do I bake a chocolate cake?"}).json()
+    assert off["abstained"] is True and off["abstain_code"] == "no_relevant_hits"
 
 
 def test_unknown_or_unsourced_artefact_is_404_and_traversal_is_blocked(client: TestClient) -> None:
