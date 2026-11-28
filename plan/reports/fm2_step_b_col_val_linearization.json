@@ -1,0 +1,1149 @@
+{
+  "experiment_name": "fm2_step_b_col_val_linearization",
+  "k": 5,
+  "overall_page_recall_at_k": 1.0,
+  "overall_page_mrr": 0.9583,
+  "overall_strict_recall_at_k": 1.0,
+  "overall_strict_mrr": 0.9167,
+  "by_type": {
+    "text": {
+      "unit_type": "text",
+      "num_queries": 4,
+      "page_recall_at_1": 1.0,
+      "page_recall_at_3": 1.0,
+      "page_recall_at_k": 1.0,
+      "page_precision_at_k": 0.35,
+      "page_mrr": 1.0,
+      "strict_recall_at_1": 1.0,
+      "strict_recall_at_3": 1.0,
+      "strict_recall_at_k": 1.0,
+      "strict_precision_at_k": 0.2,
+      "strict_mrr": 1.0,
+      "page_recall_at": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0
+      },
+      "strict_recall_at": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0
+      }
+    },
+    "figure": {
+      "unit_type": "figure",
+      "num_queries": 4,
+      "page_recall_at_1": 1.0,
+      "page_recall_at_3": 1.0,
+      "page_recall_at_k": 1.0,
+      "page_precision_at_k": 0.4,
+      "page_mrr": 1.0,
+      "strict_recall_at_1": 0.75,
+      "strict_recall_at_3": 1.0,
+      "strict_recall_at_k": 1.0,
+      "strict_precision_at_k": 0.2,
+      "strict_mrr": 0.875,
+      "page_recall_at": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0
+      },
+      "strict_recall_at": {
+        "1": 0.75,
+        "3": 1.0,
+        "5": 1.0
+      }
+    },
+    "table": {
+      "unit_type": "table",
+      "num_queries": 4,
+      "page_recall_at_1": 0.75,
+      "page_recall_at_3": 1.0,
+      "page_recall_at_k": 1.0,
+      "page_precision_at_k": 0.3,
+      "page_mrr": 0.875,
+      "strict_recall_at_1": 0.75,
+      "strict_recall_at_3": 1.0,
+      "strict_recall_at_k": 1.0,
+      "strict_precision_at_k": 0.2,
+      "strict_mrr": 0.875,
+      "page_recall_at": {
+        "1": 0.75,
+        "3": 1.0,
+        "5": 1.0
+      },
+      "strict_recall_at": {
+        "1": 0.75,
+        "3": 1.0,
+        "5": 1.0
+      }
+    }
+  },
+  "faithfulness_pass_rate": 0.8,
+  "faithfulness_details": [
+    {
+      "query_id": "Q_FIG_01",
+      "query": "Show the engine starter relay control wiring diagram for Model 737-800",
+      "expected_type": "figure",
+      "gold_citation": "amt_handbook p.3",
+      "gold_hint": "Figure 9-14",
+      "returned_citation": "amt_handbook p.3",
+      "returned_citation_path": "amt_handbook > p.3 > amt_handbook__p0003__figure_001",
+      "returned_modality": "figure",
+      "grounded_caption": "Figure 9-14. Engine Starter Relay Control Wiring Diagram (Model 737-800)",
+      "grounded_answer": "Figure 9-14. Engine Starter Relay Control Wiring Diagram (Model 737-800) (figure image returned) [amt_handbook > p.3 > amt_handbook__p0003__figure_001]",
+      "abstained": false,
+      "abstain_code": null,
+      "citation_correct": true,
+      "artefact_correct": true,
+      "keyword_coverage": 1.0,
+      "answer_correct": true,
+      "faithful": true,
+      "flag": "OK_EXACT_ARTEFACT"
+    },
+    {
+      "query_id": "Q_FIG_02",
+      "query": "Show the AC generator control relay and bus tie schematic for Model 737-400",
+      "expected_type": "figure",
+      "gold_citation": "amt_handbook p.2",
+      "gold_hint": "Figure 9-12",
+      "returned_citation": "amt_handbook p.2",
+      "returned_citation_path": "amt_handbook > p.2 > amt_handbook__p0002__figure_001",
+      "returned_modality": "figure",
+      "grounded_caption": "Figure 9-12. Generator Control Relay & Bus Tie Schematic (Model 737-400)",
+      "grounded_answer": "Figure 9-12. Generator Control Relay & Bus Tie Schematic (Model 737-400) (figure image returned) [amt_handbook > p.2 > amt_handbook__p0002__figure_001]",
+      "abstained": false,
+      "abstain_code": null,
+      "citation_correct": true,
+      "artefact_correct": true,
+      "keyword_coverage": 1.0,
+      "answer_correct": true,
+      "faithful": true,
+      "flag": "OK_EXACT_ARTEFACT"
+    },
+    {
+      "query_id": "Q_TAB_01",
+      "query": "What is the dry and lubed torque spec table for bolt part number AN4-12A?",
+      "expected_type": "table",
+      "gold_citation": "amt_handbook p.1",
+      "gold_hint": "Table 4-1",
+      "returned_citation": "amt_handbook p.1",
+      "returned_citation_path": "amt_handbook > p.1 > amt_handbook__p0001__table_001",
+      "returned_modality": "table",
+      "grounded_caption": "Table 4-1. Standard Airframe Bolt Torque Specifications (Model 737-800)",
+      "grounded_answer": "Table 4-1. Standard Airframe Bolt Torque Specifications (Model 737-800) \u2014 Part Number = AN4-12A; Thread Size = 1/4-28; Application = Elevator Bellcrank Mount; Dry Torque (in-lbs) = 50-70; Lubed Torque (in-lbs) = 35-45 [amt_handbook > p.1 > amt_handbook__p0001__table_001]",
+      "abstained": false,
+      "abstain_code": null,
+      "citation_correct": true,
+      "artefact_correct": true,
+      "keyword_coverage": 1.0,
+      "answer_correct": true,
+      "faithful": true,
+      "flag": "OK_EXACT_ARTEFACT"
+    },
+    {
+      "query_id": "Q_TAB_02",
+      "query": "Lookup table entry and specifications for part number NAS1304-15",
+      "expected_type": "table",
+      "gold_citation": "amt_handbook p.1",
+      "gold_hint": "Table 4-1",
+      "returned_citation": null,
+      "returned_modality": null,
+      "abstained": true,
+      "abstain_code": "no_relevant_hits",
+      "citation_correct": false,
+      "artefact_correct": false,
+      "keyword_coverage": 0.0,
+      "answer_correct": false,
+      "faithful": false,
+      "flag": "ABSTAINED_NO_ANSWER"
+    },
+    {
+      "query_id": "Q_TXT_01",
+      "query": "What is the nominal operating pressure and thermal relief valve cracking pressure of the 737-800 hydraulic flight control system?",
+      "expected_type": "text",
+      "gold_citation": "amt_handbook p.1",
+      "gold_hint": "3,000 PSI",
+      "returned_citation": "amt_handbook p.1",
+      "returned_citation_path": "amt_handbook > p.1 > amt_handbook__p0001__text_001",
+      "returned_modality": "text",
+      "grounded_caption": null,
+      "grounded_answer": "All primary structural fasteners on the Model 737-800 airframe must be tightened using a calibrated torque wrench inspected within the last 90 days. The primary hydraulic flight control system operates at a nominal pressure of 3,000 PSI with a thermal relief valve cracking pressure of 3,750 PSI. [amt_handbook > p.1 > amt_handbook__p0001__text_001]",
+      "abstained": false,
+      "abstain_code": null,
+      "citation_correct": true,
+      "artefact_correct": true,
+      "keyword_coverage": 1.0,
+      "answer_correct": true,
+      "faithful": true,
+      "flag": "OK_EXACT_ARTEFACT"
+    }
+  ],
+  "layer_b": {
+    "answer_correctness": 0.9167,
+    "faithfulness_pass_rate": 0.8,
+    "citation_accuracy": 1.0,
+    "wrong_source_rate": 0.0,
+    "artefact_correctness": 0.875,
+    "abstention_count": 1
+  },
+  "layer_c": {
+    "retrieval_p50_ms": 0.68,
+    "retrieval_p95_ms": 1.46,
+    "generation_p50_ms": 0.59,
+    "generation_p95_ms": 1.51,
+    "total_p50_ms": 1.26,
+    "total_p95_ms": 2.97,
+    "calls_per_query": 0.0,
+    "ingestion_time_ms": 608.66,
+    "index_size_bytes": 49322,
+    "queries_per_min_under_cap": 20.0,
+    "rate_limit_headroom_qpm": 20.0
+  },
+  "recall_cutoffs": [
+    1,
+    3,
+    5
+  ],
+  "per_question": [
+    {
+      "query_id": "Q_FIG_01",
+      "expected_type": "figure",
+      "query": "Show the engine starter relay control wiring diagram for Model 737-800",
+      "gold": "amt_handbook p.3",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "page_relevant_in_top_k": 2,
+      "strict_relevant_in_top_k": 1,
+      "retrieval_ms": 0.922,
+      "top_hits": [
+        {
+          "rank": 1,
+          "unit_id": "amt_handbook__p0003__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.3",
+          "score": 1.0,
+          "relevant": true
+        },
+        {
+          "rank": 2,
+          "unit_id": "amt_handbook__p0003__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.3",
+          "score": 0.9959,
+          "relevant": false
+        },
+        {
+          "rank": 3,
+          "unit_id": "amt_handbook__p0002__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.2",
+          "score": 0.5848,
+          "relevant": false
+        },
+        {
+          "rank": 4,
+          "unit_id": "amt_handbook__p0002__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.2",
+          "score": 0.5404,
+          "relevant": false
+        },
+        {
+          "rank": 5,
+          "unit_id": "dude_hydraulic_manual__p0002__figure_001",
+          "type": "figure",
+          "citation": "dude_hydraulic_manual p.2",
+          "score": 0.2283,
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query_id": "Q_FIG_02",
+      "expected_type": "figure",
+      "query": "Show the AC generator control relay and bus tie schematic for Model 737-400",
+      "gold": "amt_handbook p.2",
+      "page_rank": 1,
+      "strict_rank": 2,
+      "page_relevant_in_top_k": 2,
+      "strict_relevant_in_top_k": 1,
+      "retrieval_ms": 0.707,
+      "top_hits": [
+        {
+          "rank": 1,
+          "unit_id": "amt_handbook__p0002__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.2",
+          "score": 1.0,
+          "relevant": false
+        },
+        {
+          "rank": 2,
+          "unit_id": "amt_handbook__p0002__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.2",
+          "score": 0.9948,
+          "relevant": true
+        },
+        {
+          "rank": 3,
+          "unit_id": "amt_handbook__p0003__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.3",
+          "score": 0.6507,
+          "relevant": false
+        },
+        {
+          "rank": 4,
+          "unit_id": "amt_handbook__p0003__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.3",
+          "score": 0.402,
+          "relevant": false
+        },
+        {
+          "rank": 5,
+          "unit_id": "dude_hydraulic_manual__p0002__figure_001",
+          "type": "figure",
+          "citation": "dude_hydraulic_manual p.2",
+          "score": 0.1867,
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query_id": "Q_FIG_03",
+      "expected_type": "figure",
+      "query": "Show the main landing gear retraction actuator seal and port diagram for Model A320",
+      "gold": "dude_hydraulic_manual p.2",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "page_relevant_in_top_k": 2,
+      "strict_relevant_in_top_k": 1,
+      "retrieval_ms": 0.642,
+      "top_hits": [
+        {
+          "rank": 1,
+          "unit_id": "dude_hydraulic_manual__p0002__figure_001",
+          "type": "figure",
+          "citation": "dude_hydraulic_manual p.2",
+          "score": 1.0,
+          "relevant": true
+        },
+        {
+          "rank": 2,
+          "unit_id": "dude_hydraulic_manual__p0002__text_001",
+          "type": "text",
+          "citation": "dude_hydraulic_manual p.2",
+          "score": 0.9654,
+          "relevant": false
+        },
+        {
+          "rank": 3,
+          "unit_id": "dude_hydraulic_manual__p0001__text_001",
+          "type": "text",
+          "citation": "dude_hydraulic_manual p.1",
+          "score": 0.4562,
+          "relevant": false
+        },
+        {
+          "rank": 4,
+          "unit_id": "amt_handbook__p0002__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.2",
+          "score": 0.2313,
+          "relevant": false
+        },
+        {
+          "rank": 5,
+          "unit_id": "amt_handbook__p0003__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.3",
+          "score": 0.2261,
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query_id": "Q_FIG_04",
+      "expected_type": "figure",
+      "query": "Diagram showing valve solenoid PIN-B7 and starter relay coil K2 wiring",
+      "gold": "amt_handbook p.3",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "page_relevant_in_top_k": 2,
+      "strict_relevant_in_top_k": 1,
+      "retrieval_ms": 0.548,
+      "top_hits": [
+        {
+          "rank": 1,
+          "unit_id": "amt_handbook__p0003__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.3",
+          "score": 1.0,
+          "relevant": true
+        },
+        {
+          "rank": 2,
+          "unit_id": "amt_handbook__p0003__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.3",
+          "score": 0.8205,
+          "relevant": false
+        },
+        {
+          "rank": 3,
+          "unit_id": "amt_handbook__p0002__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.2",
+          "score": 0.73,
+          "relevant": false
+        },
+        {
+          "rank": 4,
+          "unit_id": "amt_handbook__p0002__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.2",
+          "score": 0.7017,
+          "relevant": false
+        },
+        {
+          "rank": 5,
+          "unit_id": "dude_hydraulic_manual__p0002__figure_001",
+          "type": "figure",
+          "citation": "dude_hydraulic_manual p.2",
+          "score": 0.3969,
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query_id": "Q_TAB_01",
+      "expected_type": "table",
+      "query": "What is the dry and lubed torque spec table for bolt part number AN4-12A?",
+      "gold": "amt_handbook p.1",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "page_relevant_in_top_k": 2,
+      "strict_relevant_in_top_k": 1,
+      "retrieval_ms": 0.468,
+      "top_hits": [
+        {
+          "rank": 1,
+          "unit_id": "amt_handbook__p0001__table_001",
+          "type": "table",
+          "citation": "amt_handbook p.1",
+          "score": 1.0,
+          "relevant": true
+        },
+        {
+          "rank": 2,
+          "unit_id": "amt_handbook__p0001__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.1",
+          "score": 0.7943,
+          "relevant": false
+        },
+        {
+          "rank": 3,
+          "unit_id": "dude_hydraulic_manual__p0001__table_001",
+          "type": "table",
+          "citation": "dude_hydraulic_manual p.1",
+          "score": 0.7072,
+          "relevant": false
+        },
+        {
+          "rank": 4,
+          "unit_id": "amt_handbook__p0002__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.2",
+          "score": 0.4078,
+          "relevant": false
+        },
+        {
+          "rank": 5,
+          "unit_id": "amt_handbook__p0002__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.2",
+          "score": 0.3873,
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query_id": "Q_TAB_02",
+      "expected_type": "table",
+      "query": "Lookup table entry and specifications for part number NAS1304-15",
+      "gold": "amt_handbook p.1",
+      "page_rank": 2,
+      "strict_rank": 2,
+      "page_relevant_in_top_k": 1,
+      "strict_relevant_in_top_k": 1,
+      "retrieval_ms": 0.331,
+      "top_hits": [
+        {
+          "rank": 1,
+          "unit_id": "dude_hydraulic_manual__p0001__table_001",
+          "type": "table",
+          "citation": "dude_hydraulic_manual p.1",
+          "score": 1.0,
+          "relevant": false
+        },
+        {
+          "rank": 2,
+          "unit_id": "amt_handbook__p0001__table_001",
+          "type": "table",
+          "citation": "amt_handbook p.1",
+          "score": 0.9914,
+          "relevant": true
+        },
+        {
+          "rank": 3,
+          "unit_id": "amt_handbook__p0002__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.2",
+          "score": 0.5776,
+          "relevant": false
+        },
+        {
+          "rank": 4,
+          "unit_id": "amt_handbook__p0002__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.2",
+          "score": 0.551,
+          "relevant": false
+        },
+        {
+          "rank": 5,
+          "unit_id": "dude_hydraulic_manual__p0002__figure_001",
+          "type": "figure",
+          "citation": "dude_hydraulic_manual p.2",
+          "score": 0.5471,
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query_id": "Q_TAB_03",
+      "expected_type": "table",
+      "query": "Lookup table entry and mandatory action for code FAULT-E409",
+      "gold": "dude_hydraulic_manual p.1",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "page_relevant_in_top_k": 1,
+      "strict_relevant_in_top_k": 1,
+      "retrieval_ms": 1.499,
+      "top_hits": [
+        {
+          "rank": 1,
+          "unit_id": "dude_hydraulic_manual__p0001__table_001",
+          "type": "table",
+          "citation": "dude_hydraulic_manual p.1",
+          "score": 1.0,
+          "relevant": true
+        },
+        {
+          "rank": 2,
+          "unit_id": "amt_handbook__p0001__table_001",
+          "type": "table",
+          "citation": "amt_handbook p.1",
+          "score": 0.6238,
+          "relevant": false
+        },
+        {
+          "rank": 3,
+          "unit_id": "dude_hydraulic_manual__p0002__figure_001",
+          "type": "figure",
+          "citation": "dude_hydraulic_manual p.2",
+          "score": 0.4997,
+          "relevant": false
+        },
+        {
+          "rank": 4,
+          "unit_id": "amt_handbook__p0002__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.2",
+          "score": 0.4823,
+          "relevant": false
+        },
+        {
+          "rank": 5,
+          "unit_id": "amt_handbook__p0002__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.2",
+          "score": 0.4752,
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query_id": "Q_TAB_04",
+      "expected_type": "table",
+      "query": "Lookup fault code FAULT-H204 PTU manifold delta pressure action in troubleshooting table",
+      "gold": "dude_hydraulic_manual p.1",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "page_relevant_in_top_k": 2,
+      "strict_relevant_in_top_k": 1,
+      "retrieval_ms": 1.429,
+      "top_hits": [
+        {
+          "rank": 1,
+          "unit_id": "dude_hydraulic_manual__p0001__table_001",
+          "type": "table",
+          "citation": "dude_hydraulic_manual p.1",
+          "score": 1.0,
+          "relevant": true
+        },
+        {
+          "rank": 2,
+          "unit_id": "dude_hydraulic_manual__p0001__text_001",
+          "type": "text",
+          "citation": "dude_hydraulic_manual p.1",
+          "score": 0.8204,
+          "relevant": false
+        },
+        {
+          "rank": 3,
+          "unit_id": "dude_hydraulic_manual__p0002__figure_001",
+          "type": "figure",
+          "citation": "dude_hydraulic_manual p.2",
+          "score": 0.6242,
+          "relevant": false
+        },
+        {
+          "rank": 4,
+          "unit_id": "amt_handbook__p0001__table_001",
+          "type": "table",
+          "citation": "amt_handbook p.1",
+          "score": 0.4728,
+          "relevant": false
+        },
+        {
+          "rank": 5,
+          "unit_id": "amt_handbook__p0001__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.1",
+          "score": 0.4243,
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query_id": "Q_TXT_01",
+      "expected_type": "text",
+      "query": "What is the nominal operating pressure and thermal relief valve cracking pressure of the 737-800 hydraulic flight control system?",
+      "gold": "amt_handbook p.1",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "page_relevant_in_top_k": 1,
+      "strict_relevant_in_top_k": 1,
+      "retrieval_ms": 1.395,
+      "top_hits": [
+        {
+          "rank": 1,
+          "unit_id": "amt_handbook__p0001__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.1",
+          "score": 1.0,
+          "relevant": true
+        },
+        {
+          "rank": 2,
+          "unit_id": "dude_hydraulic_manual__p0001__text_001",
+          "type": "text",
+          "citation": "dude_hydraulic_manual p.1",
+          "score": 0.7383,
+          "relevant": false
+        },
+        {
+          "rank": 3,
+          "unit_id": "dude_hydraulic_manual__p0002__figure_001",
+          "type": "figure",
+          "citation": "dude_hydraulic_manual p.2",
+          "score": 0.5172,
+          "relevant": false
+        },
+        {
+          "rank": 4,
+          "unit_id": "dude_hydraulic_manual__p0002__text_001",
+          "type": "text",
+          "citation": "dude_hydraulic_manual p.2",
+          "score": 0.4897,
+          "relevant": false
+        },
+        {
+          "rank": 5,
+          "unit_id": "dude_hydraulic_manual__p0001__table_001",
+          "type": "table",
+          "citation": "dude_hydraulic_manual p.1",
+          "score": 0.417,
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query_id": "Q_TXT_02",
+      "expected_type": "text",
+      "query": "What nitrogen pre-charge pressure is required on the Model A320 hydraulic accumulator at 20 degrees Celsius?",
+      "gold": "dude_hydraulic_manual p.1",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "page_relevant_in_top_k": 2,
+      "strict_relevant_in_top_k": 1,
+      "retrieval_ms": 0.818,
+      "top_hits": [
+        {
+          "rank": 1,
+          "unit_id": "dude_hydraulic_manual__p0001__text_001",
+          "type": "text",
+          "citation": "dude_hydraulic_manual p.1",
+          "score": 1.0,
+          "relevant": true
+        },
+        {
+          "rank": 2,
+          "unit_id": "dude_hydraulic_manual__p0002__figure_001",
+          "type": "figure",
+          "citation": "dude_hydraulic_manual p.2",
+          "score": 0.3124,
+          "relevant": false
+        },
+        {
+          "rank": 3,
+          "unit_id": "amt_handbook__p0001__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.1",
+          "score": 0.3038,
+          "relevant": false
+        },
+        {
+          "rank": 4,
+          "unit_id": "dude_hydraulic_manual__p0002__text_001",
+          "type": "text",
+          "citation": "dude_hydraulic_manual p.2",
+          "score": 0.2833,
+          "relevant": false
+        },
+        {
+          "rank": 5,
+          "unit_id": "dude_hydraulic_manual__p0001__table_001",
+          "type": "table",
+          "citation": "dude_hydraulic_manual p.1",
+          "score": 0.1673,
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query_id": "Q_TXT_03",
+      "expected_type": "text",
+      "query": "How does current flow when the start switch is placed in the GND position on the 737-800 overhead panel?",
+      "gold": "amt_handbook p.3",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "page_relevant_in_top_k": 2,
+      "strict_relevant_in_top_k": 1,
+      "retrieval_ms": 0.448,
+      "top_hits": [
+        {
+          "rank": 1,
+          "unit_id": "amt_handbook__p0003__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.3",
+          "score": 1.0,
+          "relevant": true
+        },
+        {
+          "rank": 2,
+          "unit_id": "amt_handbook__p0003__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.3",
+          "score": 0.7256,
+          "relevant": false
+        },
+        {
+          "rank": 3,
+          "unit_id": "amt_handbook__p0002__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.2",
+          "score": 0.3019,
+          "relevant": false
+        },
+        {
+          "rank": 4,
+          "unit_id": "amt_handbook__p0002__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.2",
+          "score": 0.2864,
+          "relevant": false
+        },
+        {
+          "rank": 5,
+          "unit_id": "dude_hydraulic_manual__p0002__text_001",
+          "type": "text",
+          "citation": "dude_hydraulic_manual p.2",
+          "score": 0.1323,
+          "relevant": false
+        }
+      ]
+    },
+    {
+      "query_id": "Q_TXT_04",
+      "expected_type": "text",
+      "query": "When does the generator control relay isolate the IDG exciter field?",
+      "gold": "amt_handbook p.2",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "page_relevant_in_top_k": 2,
+      "strict_relevant_in_top_k": 1,
+      "retrieval_ms": 0.29,
+      "top_hits": [
+        {
+          "rank": 1,
+          "unit_id": "amt_handbook__p0002__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.2",
+          "score": 1.0,
+          "relevant": true
+        },
+        {
+          "rank": 2,
+          "unit_id": "amt_handbook__p0002__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.2",
+          "score": 0.8682,
+          "relevant": false
+        },
+        {
+          "rank": 3,
+          "unit_id": "amt_handbook__p0003__figure_001",
+          "type": "figure",
+          "citation": "amt_handbook p.3",
+          "score": 0.6651,
+          "relevant": false
+        },
+        {
+          "rank": 4,
+          "unit_id": "amt_handbook__p0003__text_001",
+          "type": "text",
+          "citation": "amt_handbook p.3",
+          "score": 0.4249,
+          "relevant": false
+        },
+        {
+          "rank": 5,
+          "unit_id": "dude_hydraulic_manual__p0001__table_001",
+          "type": "table",
+          "citation": "dude_hydraulic_manual p.1",
+          "score": 0.0576,
+          "relevant": false
+        }
+      ]
+    }
+  ],
+  "latency_ms": {
+    "retrieval_p50": 0.675,
+    "retrieval_p95": 1.46,
+    "retrieval_mean": 0.791
+  },
+  "answer_quality": {
+    "method": "extractive answers; correctness = all expected_keywords visible in the answer (grounded answer + caption + artefact); citation = cited doc+page in gold_pages",
+    "overall": {
+      "n": 12,
+      "answered": 11,
+      "abstention_rate": 0.0833,
+      "answer_correctness": 0.9167,
+      "mean_keyword_coverage": 0.9167,
+      "citation_accuracy": 1.0,
+      "wrong_source_rate": 0.0,
+      "artefact_correctness": 0.875
+    },
+    "by_type": {
+      "text": {
+        "n": 4,
+        "answered": 4,
+        "abstention_rate": 0.0,
+        "answer_correctness": 1.0,
+        "mean_keyword_coverage": 1.0,
+        "citation_accuracy": 1.0,
+        "wrong_source_rate": 0.0,
+        "artefact_correctness": null
+      },
+      "figure": {
+        "n": 4,
+        "answered": 4,
+        "abstention_rate": 0.0,
+        "answer_correctness": 1.0,
+        "mean_keyword_coverage": 1.0,
+        "citation_accuracy": 1.0,
+        "wrong_source_rate": 0.0,
+        "artefact_correctness": 1.0
+      },
+      "table": {
+        "n": 4,
+        "answered": 3,
+        "abstention_rate": 0.25,
+        "answer_correctness": 0.75,
+        "mean_keyword_coverage": 0.75,
+        "citation_accuracy": 1.0,
+        "wrong_source_rate": 0.0,
+        "artefact_correctness": 0.75
+      }
+    },
+    "latency_ms": {
+      "answer_p50": 0.586,
+      "answer_p95": 1.506
+    },
+    "per_question": [
+      {
+        "query_id": "Q_FIG_01",
+        "query": "Show the engine starter relay control wiring diagram for Model 737-800",
+        "expected_type": "figure",
+        "gold_citation": "amt_handbook p.3",
+        "gold_hint": "Figure 9-14",
+        "returned_citation": "amt_handbook p.3",
+        "returned_citation_path": "amt_handbook > p.3 > amt_handbook__p0003__figure_001",
+        "returned_modality": "figure",
+        "grounded_caption": "Figure 9-14. Engine Starter Relay Control Wiring Diagram (Model 737-800)",
+        "grounded_answer": "Figure 9-14. Engine Starter Relay Control Wiring Diagram (Model 737-800) (figure image returned) [amt_handbook > p.3 > amt_handbook__p0003__figure_001]",
+        "abstained": false,
+        "abstain_code": null,
+        "citation_correct": true,
+        "artefact_correct": true,
+        "keyword_coverage": 1.0,
+        "answer_correct": true,
+        "faithful": true,
+        "flag": "OK_EXACT_ARTEFACT"
+      },
+      {
+        "query_id": "Q_FIG_02",
+        "query": "Show the AC generator control relay and bus tie schematic for Model 737-400",
+        "expected_type": "figure",
+        "gold_citation": "amt_handbook p.2",
+        "gold_hint": "Figure 9-12",
+        "returned_citation": "amt_handbook p.2",
+        "returned_citation_path": "amt_handbook > p.2 > amt_handbook__p0002__figure_001",
+        "returned_modality": "figure",
+        "grounded_caption": "Figure 9-12. Generator Control Relay & Bus Tie Schematic (Model 737-400)",
+        "grounded_answer": "Figure 9-12. Generator Control Relay & Bus Tie Schematic (Model 737-400) (figure image returned) [amt_handbook > p.2 > amt_handbook__p0002__figure_001]",
+        "abstained": false,
+        "abstain_code": null,
+        "citation_correct": true,
+        "artefact_correct": true,
+        "keyword_coverage": 1.0,
+        "answer_correct": true,
+        "faithful": true,
+        "flag": "OK_EXACT_ARTEFACT"
+      },
+      {
+        "query_id": "Q_FIG_03",
+        "query": "Show the main landing gear retraction actuator seal and port diagram for Model A320",
+        "expected_type": "figure",
+        "gold_citation": "dude_hydraulic_manual p.2",
+        "gold_hint": "Figure 2-1",
+        "returned_citation": "dude_hydraulic_manual p.2",
+        "returned_citation_path": "dude_hydraulic_manual > p.2 > dude_hydraulic_manual__p0002__figure_001",
+        "returned_modality": "figure",
+        "grounded_caption": "Figure 2-1. Main Landing Gear Retraction Actuator Seal & Port Diagram (Model A320)",
+        "grounded_answer": "Figure 2-1. Main Landing Gear Retraction Actuator Seal & Port Diagram (Model A320) (figure image returned) [dude_hydraulic_manual > p.2 > dude_hydraulic_manual__p0002__figure_001]",
+        "abstained": false,
+        "abstain_code": null,
+        "citation_correct": true,
+        "artefact_correct": true,
+        "keyword_coverage": 1.0,
+        "answer_correct": true,
+        "faithful": true,
+        "flag": "OK_EXACT_ARTEFACT"
+      },
+      {
+        "query_id": "Q_FIG_04",
+        "query": "Diagram showing valve solenoid PIN-B7 and starter relay coil K2 wiring",
+        "expected_type": "figure",
+        "gold_citation": "amt_handbook p.3",
+        "gold_hint": "Figure 9-14",
+        "returned_citation": "amt_handbook p.3",
+        "returned_citation_path": "amt_handbook > p.3 > amt_handbook__p0003__figure_001",
+        "returned_modality": "figure",
+        "grounded_caption": "Figure 9-14. Engine Starter Relay Control Wiring Diagram (Model 737-800)",
+        "grounded_answer": "Figure 9-14. Engine Starter Relay Control Wiring Diagram (Model 737-800) (figure image returned) [amt_handbook > p.3 > amt_handbook__p0003__figure_001]",
+        "abstained": false,
+        "abstain_code": null,
+        "citation_correct": true,
+        "artefact_correct": true,
+        "keyword_coverage": 1.0,
+        "answer_correct": true,
+        "faithful": true,
+        "flag": "OK_EXACT_ARTEFACT"
+      },
+      {
+        "query_id": "Q_TAB_01",
+        "query": "What is the dry and lubed torque spec table for bolt part number AN4-12A?",
+        "expected_type": "table",
+        "gold_citation": "amt_handbook p.1",
+        "gold_hint": "Table 4-1",
+        "returned_citation": "amt_handbook p.1",
+        "returned_citation_path": "amt_handbook > p.1 > amt_handbook__p0001__table_001",
+        "returned_modality": "table",
+        "grounded_caption": "Table 4-1. Standard Airframe Bolt Torque Specifications (Model 737-800)",
+        "grounded_answer": "Table 4-1. Standard Airframe Bolt Torque Specifications (Model 737-800) \u2014 Part Number = AN4-12A; Thread Size = 1/4-28; Application = Elevator Bellcrank Mount; Dry Torque (in-lbs) = 50-70; Lubed Torque (in-lbs) = 35-45 [amt_handbook > p.1 > amt_handbook__p0001__table_001]",
+        "abstained": false,
+        "abstain_code": null,
+        "citation_correct": true,
+        "artefact_correct": true,
+        "keyword_coverage": 1.0,
+        "answer_correct": true,
+        "faithful": true,
+        "flag": "OK_EXACT_ARTEFACT"
+      },
+      {
+        "query_id": "Q_TAB_02",
+        "query": "Lookup table entry and specifications for part number NAS1304-15",
+        "expected_type": "table",
+        "gold_citation": "amt_handbook p.1",
+        "gold_hint": "Table 4-1",
+        "returned_citation": null,
+        "returned_modality": null,
+        "abstained": true,
+        "abstain_code": "no_relevant_hits",
+        "citation_correct": false,
+        "artefact_correct": false,
+        "keyword_coverage": 0.0,
+        "answer_correct": false,
+        "faithful": false,
+        "flag": "ABSTAINED_NO_ANSWER"
+      },
+      {
+        "query_id": "Q_TAB_03",
+        "query": "Lookup table entry and mandatory action for code FAULT-E409",
+        "expected_type": "table",
+        "gold_citation": "dude_hydraulic_manual p.1",
+        "gold_hint": "Table 2-3",
+        "returned_citation": "dude_hydraulic_manual p.1",
+        "returned_citation_path": "dude_hydraulic_manual > p.1 > dude_hydraulic_manual__p0001__table_001",
+        "returned_modality": "table",
+        "grounded_caption": "Table 2-3. Hydraulic Electronic Monitoring Fault Codes & Corrective Actions",
+        "grounded_answer": "Table 2-3. Hydraulic Electronic Monitoring Fault Codes & Corrective Actions \u2014 Fault Code = FAULT-E409; Subsystem = Green Reservoir; Trigger Condition = Fluid level < 2.1 Liters; Mandatory Action = Inspect return line & refill Skydrol LD-4 [dude_hydraulic_manual > p.1 > dude_hydraulic_manual__p0001__table_001]",
+        "abstained": false,
+        "abstain_code": null,
+        "citation_correct": true,
+        "artefact_correct": true,
+        "keyword_coverage": 1.0,
+        "answer_correct": true,
+        "faithful": true,
+        "flag": "OK_EXACT_ARTEFACT"
+      },
+      {
+        "query_id": "Q_TAB_04",
+        "query": "Lookup fault code FAULT-H204 PTU manifold delta pressure action in troubleshooting table",
+        "expected_type": "table",
+        "gold_citation": "dude_hydraulic_manual p.1",
+        "gold_hint": "Table 2-3",
+        "returned_citation": "dude_hydraulic_manual p.1",
+        "returned_citation_path": "dude_hydraulic_manual > p.1 > dude_hydraulic_manual__p0001__table_001",
+        "returned_modality": "table",
+        "grounded_caption": "Table 2-3. Hydraulic Electronic Monitoring Fault Codes & Corrective Actions",
+        "grounded_answer": "Table 2-3. Hydraulic Electronic Monitoring Fault Codes & Corrective Actions \u2014 Fault Code = FAULT-H204; Subsystem = PTU Manifold; Trigger Condition = Delta pressure > 650 PSI; Mandatory Action = Replace PTU transfer control valve V-12 [dude_hydraulic_manual > p.1 > dude_hydraulic_manual__p0001__table_001]",
+        "abstained": false,
+        "abstain_code": null,
+        "citation_correct": true,
+        "artefact_correct": true,
+        "keyword_coverage": 1.0,
+        "answer_correct": true,
+        "faithful": true,
+        "flag": "OK_EXACT_ARTEFACT"
+      },
+      {
+        "query_id": "Q_TXT_01",
+        "query": "What is the nominal operating pressure and thermal relief valve cracking pressure of the 737-800 hydraulic flight control system?",
+        "expected_type": "text",
+        "gold_citation": "amt_handbook p.1",
+        "gold_hint": "3,000 PSI",
+        "returned_citation": "amt_handbook p.1",
+        "returned_citation_path": "amt_handbook > p.1 > amt_handbook__p0001__text_001",
+        "returned_modality": "text",
+        "grounded_caption": null,
+        "grounded_answer": "All primary structural fasteners on the Model 737-800 airframe must be tightened using a calibrated torque wrench inspected within the last 90 days. The primary hydraulic flight control system operates at a nominal pressure of 3,000 PSI with a thermal relief valve cracking pressure of 3,750 PSI. [amt_handbook > p.1 > amt_handbook__p0001__text_001]",
+        "abstained": false,
+        "abstain_code": null,
+        "citation_correct": true,
+        "artefact_correct": true,
+        "keyword_coverage": 1.0,
+        "answer_correct": true,
+        "faithful": true,
+        "flag": "OK_EXACT_ARTEFACT"
+      },
+      {
+        "query_id": "Q_TXT_02",
+        "query": "What nitrogen pre-charge pressure is required on the Model A320 hydraulic accumulator at 20 degrees Celsius?",
+        "expected_type": "text",
+        "gold_citation": "dude_hydraulic_manual p.1",
+        "gold_hint": "1,450 PSI",
+        "returned_citation": "dude_hydraulic_manual p.1",
+        "returned_citation_path": "dude_hydraulic_manual > p.1 > dude_hydraulic_manual__p0001__text_001",
+        "returned_modality": "text",
+        "grounded_caption": null,
+        "grounded_answer": "Before servicing the yellow or green hydraulic manifold on the Model A320, depressurize the accumulator to 0 PSI and verify that nitrogen pre-charge reads 1,450 PSI at 20 degrees Celsius ambient temperature. [dude_hydraulic_manual > p.1 > dude_hydraulic_manual__p0001__text_001]",
+        "abstained": false,
+        "abstain_code": null,
+        "citation_correct": true,
+        "artefact_correct": true,
+        "keyword_coverage": 1.0,
+        "answer_correct": true,
+        "faithful": true,
+        "flag": "OK_EXACT_ARTEFACT"
+      },
+      {
+        "query_id": "Q_TXT_03",
+        "query": "How does current flow when the start switch is placed in the GND position on the 737-800 overhead panel?",
+        "expected_type": "text",
+        "gold_citation": "amt_handbook p.3",
+        "gold_hint": "N2 RPM cutout switch",
+        "returned_citation": "amt_handbook p.3",
+        "returned_citation_path": "amt_handbook > p.3 > amt_handbook__p0003__text_001",
+        "returned_modality": "text",
+        "grounded_caption": null,
+        "grounded_answer": "When the start switch is placed in the GND position on the Model 737-800 overhead panel, current flows through the N2 RPM cutout switch to energize the starter relay coil and open the pneumatic starter shutoff valve. [amt_handbook > p.3 > amt_handbook__p0003__text_001]",
+        "abstained": false,
+        "abstain_code": null,
+        "citation_correct": true,
+        "artefact_correct": true,
+        "keyword_coverage": 1.0,
+        "answer_correct": true,
+        "faithful": true,
+        "flag": "OK_EXACT_ARTEFACT"
+      },
+      {
+        "query_id": "Q_TXT_04",
+        "query": "When does the generator control relay isolate the IDG exciter field?",
+        "expected_type": "text",
+        "gold_citation": "amt_handbook p.2",
+        "gold_hint": "overvoltage or differential current",
+        "returned_citation": "amt_handbook p.2",
+        "returned_citation_path": "amt_handbook > p.2 > amt_handbook__p0002__text_001",
+        "returned_modality": "text",
+        "grounded_caption": null,
+        "grounded_answer": "The generator control relay isolates the IDG exciter field whenever an overvoltage or differential current fault is latched by the Generator Control Unit (GCU). Refer to the schematic below for relay coil pinouts. [amt_handbook > p.2 > amt_handbook__p0002__text_001]",
+        "abstained": false,
+        "abstain_code": null,
+        "citation_correct": true,
+        "artefact_correct": true,
+        "keyword_coverage": 1.0,
+        "answer_correct": true,
+        "faithful": true,
+        "flag": "OK_EXACT_ARTEFACT"
+      }
+    ]
+  },
+  "config_snapshot": {
+    "include_nearby_context": true,
+    "flatten_tables": false,
+    "table_linearization_mode": "col_val_and_markdown",
+    "enable_bm25_fusion": false,
+    "alpha": 1.0,
+    "ocr_gate_enabled": true,
+    "embedding_provider": "local_bge",
+    "embedding_model_name": "BAAI/bge-small-en-v1.5"
+  }
+}

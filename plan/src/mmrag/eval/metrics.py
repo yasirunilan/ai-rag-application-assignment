@@ -1,103 +1,108 @@
 """Three-Layer Evaluation Harness: Layers A, B, and C (Person 5 · Stories E7.1 / E8.1–E8.4).
 
-- Layer A (Retrieval, generator out of loop, by type): Recall@1, Recall@3, Recall@5/@k,
-  Precision@k, and MRR for both Page-Level and Strict Modality+Page matching, plus per-question trace.
-- Layer B (Answer & Grounding): Answer correctness (key-fact rubric), faithfulness,
-  citation accuracy, explicit wrong-source rate, and artefact correctness.
-- Layer C (Operational): Retrieval vs generation latency (p50 / p95), calls per query,
-  ingestion time, index size on disk, and queries/min headroom under the 20 req/min free-tier cap.
+Generator out of the loop for Layer A: only the retriever is scored under two relevance definitions:
+1. Page-level: `hit.doc_id == gold_doc_id` and `hit.page in gold_pages`.
+2. Strict modality+page: the hit must also have `hit.unit.type == gold.expected_type`, so a prose
+   chunk on page 212 cannot hide a missed wiring-diagram figure on page 212.
+
+Reports recall at several cut-offs (default 1, 3, 5), MRR, precision@k, retrieval latency p50/p95,
+per-question results, Layer B grounding summary, Layer C operational headroom, and report diffs:
+
+    python -m mmrag.eval.metrics diff reports/fm1_before_caption_drift.json reports/fm1_after_context_grounded_caption.json
 """
 
 from __future__ import annotations
 
+import argparse
 import json
-import time
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+import time
+from typing import Any, Optional, Sequence
 
 import numpy as np
 
-from mmrag.answer.responder import build_answer_from_hits
 from mmrag.config import AppConfig, get_openrouter_api_key
-from mmrag.eval.faithfulness import _is_valid_png_file, run_faithfulness_spotcheck
 from mmrag.retrieve.retriever import HybridRetriever
 from mmrag.schemas import (
     EvalReport,
     GoldQuestion,
     LayerBMetrics,
     LayerCMetrics,
-    QuestionEvalResult,
     SearchHit,
-    TableArtefact,
     TypeMetrics,
 )
 
 FREE_TIER_RPM_CAP = 20.0
+UNIT_TYPES = ("text", "figure", "table")
+DEFAULT_RECALL_CUTOFFS = (1, 3, 5)
 
 
-@dataclass
-class _QueryScore:
-    page_r1: float
-    page_r3: float
-    page_rk: float
-    page_prec: float
-    page_rr: float
-    strict_r1: float
-    strict_r3: float
-    strict_rk: float
-    strict_prec: float
-    strict_rr: float
-    trace: QuestionEvalResult
+def _is_page_match(hit: SearchHit, q: GoldQuestion) -> bool:
+    prov = hit.unit.provenance
+    return prov.doc_id == q.gold_doc_id and prov.page is not None and int(prov.page) in q.gold_pages
 
 
-def _score_single_query_detailed(q: GoldQuestion, hits: list[SearchHit], top_k: int) -> _QueryScore:
+def _first_relevant_ranks(q: GoldQuestion, hits: list[SearchHit]) -> tuple[Optional[int], Optional[int]]:
+    """Returns `(first page-level relevant rank, first strict relevant rank)`; None when absent."""
     page_rank: Optional[int] = None
     strict_rank: Optional[int] = None
-    page_rel_count = 0
-    strict_rel_count = 0
-
-    for rank_idx, h in enumerate(hits[:top_k], start=1):
-        u = h.unit
-        doc_match = u.provenance.doc_id == q.gold_doc_id
-        page_match = (u.provenance.page is not None) and (int(u.provenance.page) in q.gold_pages)
-        if doc_match and page_match:
-            page_rel_count += 1
+    for rank_idx, h in enumerate(hits, start=1):
+        if _is_page_match(h, q):
             if page_rank is None:
                 page_rank = rank_idx
-            if u.type == q.expected_type:
-                strict_rel_count += 1
-                if strict_rank is None:
-                    strict_rank = rank_idx
+            if strict_rank is None and h.unit.type == q.expected_type:
+                strict_rank = rank_idx
+    return page_rank, strict_rank
 
-    denom = max(1, top_k)
-    top_hit = hits[0] if hits else None
-    trace = QuestionEvalResult(
-        query_id=q.query_id,
-        expected_type=q.expected_type,
-        gold_doc_id=q.gold_doc_id,
-        gold_pages=list(q.gold_pages),
-        top_hit_unit_id=top_hit.unit.unit_id if top_hit else None,
-        top_hit_citation=top_hit.citation if top_hit else None,
-        top_hit_type=top_hit.unit.type if top_hit else None,
-        page_rank=page_rank,
-        strict_rank=strict_rank,
-        strict_hit_at_1=(strict_rank == 1),
-        strict_hit_at_3=(strict_rank is not None and strict_rank <= 3),
-        strict_hit_at_5=(strict_rank is not None and strict_rank <= 5),
-    )
-    return _QueryScore(
-        page_r1=1.0 if page_rank == 1 else 0.0,
-        page_r3=1.0 if (page_rank is not None and page_rank <= 3) else 0.0,
-        page_rk=1.0 if page_rank is not None else 0.0,
-        page_prec=page_rel_count / denom,
-        page_rr=(1.0 / page_rank) if page_rank is not None else 0.0,
-        strict_r1=1.0 if strict_rank == 1 else 0.0,
-        strict_r3=1.0 if (strict_rank is not None and strict_rank <= 3) else 0.0,
-        strict_rk=1.0 if strict_rank is not None else 0.0,
-        strict_prec=strict_rel_count / denom,
-        strict_rr=(1.0 / strict_rank) if strict_rank is not None else 0.0,
-        trace=trace,
+
+def _score_single_query(q: GoldQuestion, hits: list[SearchHit]) -> tuple[float, float, float, float]:
+    """Returns `(page_recall, page_rr, strict_recall, strict_rr)` for one gold question over `hits`."""
+    page_rank, strict_rank = _first_relevant_ranks(q, hits)
+    page_rr = 1.0 / page_rank if page_rank else 0.0
+    strict_rr = 1.0 / strict_rank if strict_rank else 0.0
+    return float(page_rank is not None), page_rr, float(strict_rank is not None), strict_rr
+
+
+def _recall_at(rank: Optional[int], k: int) -> float:
+    return 1.0 if rank is not None and rank <= k else 0.0
+
+
+def _mean(values: Sequence[float]) -> float:
+    return round(float(sum(values)) / len(values), 4) if values else 0.0
+
+
+def _percentiles_ms(samples: Sequence[float], prefix: str) -> dict[str, float]:
+    if not samples:
+        return {}
+    arr = np.asarray(samples, dtype=np.float64)
+    return {
+        f"{prefix}_p50": round(float(np.percentile(arr, 50)), 3),
+        f"{prefix}_p95": round(float(np.percentile(arr, 95)), 3),
+        f"{prefix}_mean": round(float(arr.mean()), 3),
+    }
+
+
+def _type_metrics(u_type: str, rows: list[dict[str, Any]], k: int, cutoffs: Sequence[int]) -> TypeMetrics:
+    page_ranks = [r["page_rank"] for r in rows]
+    strict_ranks = [r["strict_rank"] for r in rows]
+    denom = max(1, k)
+    page_at = {c: _mean([_recall_at(x, c) for x in page_ranks]) for c in cutoffs}
+    strict_at = {c: _mean([_recall_at(x, c) for x in strict_ranks]) for c in cutoffs}
+    return TypeMetrics(
+        unit_type=u_type,
+        num_queries=len(rows),
+        page_recall_at_1=page_at.get(1, _mean([_recall_at(x, 1) for x in page_ranks])),
+        page_recall_at_3=page_at.get(3, _mean([_recall_at(x, 3) for x in page_ranks])),
+        page_recall_at_k=_mean([_recall_at(x, k) for x in page_ranks]),
+        page_precision_at_k=_mean([r.get("page_relevant_in_top_k", 0) / denom for r in rows]),
+        page_mrr=_mean([1.0 / x if x and x <= k else 0.0 for x in page_ranks]),
+        strict_recall_at_1=strict_at.get(1, _mean([_recall_at(x, 1) for x in strict_ranks])),
+        strict_recall_at_3=strict_at.get(3, _mean([_recall_at(x, 3) for x in strict_ranks])),
+        strict_recall_at_k=_mean([_recall_at(x, k) for x in strict_ranks]),
+        strict_precision_at_k=_mean([r["strict_relevant_in_top_k"] / denom for r in rows]),
+        strict_mrr=_mean([1.0 / x if x and x <= k else 0.0 for x in strict_ranks]),
+        page_recall_at=page_at,
+        strict_recall_at=strict_at,
     )
 
 
@@ -108,56 +113,72 @@ def evaluate_retrieval_by_type(
     experiment_name: str = "baseline",
     k: Optional[int] = None,
     save_report: bool = True,
+    recall_cutoffs: Sequence[int] = DEFAULT_RECALL_CUTOFFS,
 ) -> EvalReport:
-    """Layer A: Evaluates Recall@1/3/k, Precision@k, and MRR by `text`, `figure`, and `table`."""
-    top_k = k or cfg.retrieve.top_k
-    buckets: dict[str, list[_QueryScore]] = {"text": [], "figure": [], "table": []}
-    all_scores: list[_QueryScore] = []
+    """Evaluates retrieval by `text`, `figure` and `table` with the generator out of the loop (E7.1).
 
+    `k` (default `retrieve.top_k`) is the depth for `*_recall_at_k`, MRR and precision@k; the
+    retriever is asked for `max(k, *recall_cutoffs)` hits so every cut-off is measurable.
+    """
+    top_k = k or cfg.retrieve.top_k
+    cutoffs = sorted({int(c) for c in recall_cutoffs if int(c) >= 1})
+    depth = max([top_k, *cutoffs])
+
+    per_question: list[dict[str, Any]] = []
+    latencies: list[float] = []
     for q in questions:
-        hits = retriever.retrieve(q.query, k=top_k)
-        s = _score_single_query_detailed(q, hits, top_k=top_k)
-        buckets.setdefault(q.expected_type, []).append(s)
-        all_scores.append(s)
+        t0 = time.perf_counter()
+        hits = retriever.retrieve(q.query, k=depth)
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        latencies.append(elapsed_ms)
+
+        page_rank, strict_rank = _first_relevant_ranks(q, hits)
+        top = hits[:top_k]
+        per_question.append(
+            {
+                "query_id": q.query_id,
+                "expected_type": q.expected_type,
+                "query": q.query,
+                "gold": f"{q.gold_doc_id} p.{','.join(str(p) for p in q.gold_pages)}",
+                "page_rank": page_rank,
+                "strict_rank": strict_rank,
+                "page_relevant_in_top_k": sum(1 for h in top if _is_page_match(h, q)),
+                "strict_relevant_in_top_k": sum(
+                    1 for h in top if _is_page_match(h, q) and h.unit.type == q.expected_type
+                ),
+                "retrieval_ms": round(elapsed_ms, 3),
+                "top_hits": [
+                    {
+                        "rank": h.rank,
+                        "unit_id": h.unit.unit_id,
+                        "type": h.unit.type,
+                        "citation": h.citation,
+                        "score": h.score,
+                        "relevant": _is_page_match(h, q) and h.unit.type == q.expected_type,
+                    }
+                    for h in top
+                ],
+            }
+        )
 
     by_type: dict[str, TypeMetrics] = {}
-    for u_type, scores in buckets.items():
-        n = len(scores)
-        if n == 0:
-            by_type[u_type] = TypeMetrics(
-                unit_type=u_type,
-                num_queries=0,
-                page_recall_at_k=0.0,
-                page_mrr=0.0,
-                strict_recall_at_k=0.0,
-                strict_mrr=0.0,
-            )
-        else:
-            by_type[u_type] = TypeMetrics(
-                unit_type=u_type,
-                num_queries=n,
-                page_recall_at_1=round(sum(x.page_r1 for x in scores) / n, 4),
-                page_recall_at_3=round(sum(x.page_r3 for x in scores) / n, 4),
-                page_recall_at_k=round(sum(x.page_rk for x in scores) / n, 4),
-                page_precision_at_k=round(sum(x.page_prec for x in scores) / n, 4),
-                page_mrr=round(sum(x.page_rr for x in scores) / n, 4),
-                strict_recall_at_1=round(sum(x.strict_r1 for x in scores) / n, 4),
-                strict_recall_at_3=round(sum(x.strict_r3 for x in scores) / n, 4),
-                strict_recall_at_k=round(sum(x.strict_rk for x in scores) / n, 4),
-                strict_precision_at_k=round(sum(x.strict_prec for x in scores) / n, 4),
-                strict_mrr=round(sum(x.strict_rr for x in scores) / n, 4),
-            )
+    types = list(UNIT_TYPES) + sorted({r["expected_type"] for r in per_question} - set(UNIT_TYPES))
+    for u_type in types:
+        rows = [r for r in per_question if r["expected_type"] == u_type]
+        by_type[u_type] = _type_metrics(u_type, rows, top_k, cutoffs)
+    overall = _type_metrics("overall", per_question, top_k, cutoffs)
 
-    total_n = max(1, len(all_scores))
     report = EvalReport(
         experiment_name=experiment_name,
         k=top_k,
-        overall_page_recall_at_k=round(sum(x.page_rk for x in all_scores) / total_n, 4),
-        overall_page_mrr=round(sum(x.page_rr for x in all_scores) / total_n, 4),
-        overall_strict_recall_at_k=round(sum(x.strict_rk for x in all_scores) / total_n, 4),
-        overall_strict_mrr=round(sum(x.strict_rr for x in all_scores) / total_n, 4),
+        overall_page_recall_at_k=overall.page_recall_at_k,
+        overall_page_mrr=overall.page_mrr,
+        overall_strict_recall_at_k=overall.strict_recall_at_k,
+        overall_strict_mrr=overall.strict_mrr,
         by_type=by_type,
-        per_question=[x.trace for x in all_scores],
+        recall_cutoffs=cutoffs,
+        per_question=per_question,
+        latency_ms=_percentiles_ms(latencies, "retrieval"),
         config_snapshot={
             "include_nearby_context": cfg.enrich.include_nearby_context,
             "flatten_tables": cfg.extract.flatten_tables,
@@ -165,114 +186,38 @@ def evaluate_retrieval_by_type(
             "enable_bm25_fusion": cfg.retrieve.enable_bm25_fusion,
             "alpha": cfg.retrieve.alpha,
             "ocr_gate_enabled": cfg.ingest.ocr_quality_gate.enabled,
+            "embedding_provider": cfg.index.embedding_provider,
+            "embedding_model_name": cfg.index.embedding_model_name,
         },
     )
 
     if save_report:
-        rep_dir = Path(cfg.project.reports_dir)
-        rep_dir.mkdir(parents=True, exist_ok=True)
-        out_path = rep_dir / f"{experiment_name}.json"
-        out_path.write_text(json.dumps(report.model_dump(), indent=2), encoding="utf-8")
-
+        save_eval_report(report, cfg)
     return report
 
 
-def evaluate_layers_b_and_c(
-    retriever: HybridRetriever,
-    questions: list[GoldQuestion],
+def build_layers_b_and_c(
+    report: EvalReport,
+    faith: dict[str, Any],
+    answer_quality: dict[str, Any],
     cfg: AppConfig,
     offline: bool = True,
     ingestion_time_ms: Optional[float] = None,
-) -> tuple[LayerBMetrics, LayerCMetrics, dict]:
-    """Evaluates Layer B (answer/grounding) and Layer C (operational latency/cost) together."""
-    faith = run_faithfulness_spotcheck(retriever, questions, cfg, sample_size=5)
+) -> tuple[LayerBMetrics, LayerCMetrics]:
+    """Summarizes Layer B (grounding) and Layer C (operational latency/QPM headroom) from eval results."""
+    overall = answer_quality.get("overall") or {}
+    n_total = int(overall.get("n") or 0)
+    n_answered = int(overall.get("answered") or 0)
 
-    ret_times: list[float] = []
-    gen_times: list[float] = []
-    tot_times: list[float] = []
-    call_counts: list[int] = []
-
-    correctness_scores: list[float] = []
-    cited_right = 0
-    confident_answers = 0
-    wrong_source_answers = 0
-    abstained_count = 0
-    artefact_questions = 0
-    artefact_correct = 0
-
-    for q in questions:
-        t0 = time.perf_counter()
-        hits = retriever.retrieve(q.query, k=cfg.retrieve.top_k)
-        t1 = time.perf_counter()
-        ans = build_answer_from_hits(q.query, hits, cfg, offline=offline)
-        t2 = time.perf_counter()
-
-        r_ms = (t1 - t0) * 1000.0
-        g_ms = (t2 - t1) * 1000.0
-        ret_times.append(r_ms)
-        gen_times.append(g_ms)
-        tot_times.append(r_ms + g_ms)
-        call_counts.append(ans.model_calls)
-
-        if q.expected_type in ("figure", "table"):
-            artefact_questions += 1
-
-        if ans.abstained or ans.source_unit is None:
-            abstained_count += 1
-            correctness_scores.append(0.0)
-            continue
-
-        confident_answers += 1
-        u = ans.source_unit
-        doc_ok = u.provenance.doc_id == q.gold_doc_id
-        page_ok = (u.provenance.page is not None) and (int(u.provenance.page) in q.gold_pages)
-        hint_ok = True
-        if q.gold_artefact_hint:
-            meta_blob = " ".join(
-                [u.provenance.nearby_caption or "", u.provenance.heading_context or "", u.search_text or ""]
-            )
-            hint_ok = q.gold_artefact_hint.lower() in meta_blob.lower()
-
-        if doc_ok and page_ok:
-            cited_right += 1
-        if not (doc_ok and page_ok and hint_ok):
-            wrong_source_answers += 1
-
-        # Artefact correctness for figure & table questions
-        if q.expected_type == "figure":
-            if doc_ok and page_ok and hint_ok and ans.modality == "figure" and isinstance(ans.artefact, str) and _is_valid_png_file(ans.artefact):
-                artefact_correct += 1
-        elif q.expected_type == "table":
-            if doc_ok and page_ok and hint_ok and ans.modality == "table" and isinstance(ans.artefact, TableArtefact) and bool(ans.artefact.rows):
-                artefact_correct += 1
-
-        # Key-fact rubric score over expected_keywords (0 if wrong source page)
-        if not (doc_ok and page_ok):
-            correctness_scores.append(0.0)
-        elif not q.expected_keywords:
-            correctness_scores.append(1.0)
-        else:
-            if isinstance(ans.artefact, TableArtefact):
-                evidence_text = ans.artefact.to_markdown() + " " + (ans.grounded_caption or "")
-            elif ans.modality == "figure":
-                evidence_text = (u.search_text or "") + " " + (ans.grounded_caption or "")
-            else:
-                evidence_text = str(ans.artefact) + " " + (ans.grounded_answer or "")
-            ev_lower = evidence_text.lower()
-            matched = sum(1 for kw in q.expected_keywords if kw.lower() in ev_lower)
-            correctness_scores.append(matched / len(q.expected_keywords))
-
-    n_q = max(1, len(questions))
     layer_b = LayerBMetrics(
-        answer_correctness=round(sum(correctness_scores) / n_q, 4),
-        faithfulness_pass_rate=faith["faithfulness_pass_rate"],
-        citation_accuracy=round(cited_right / n_q, 4),
-        wrong_source_rate=round(wrong_source_answers / max(1, confident_answers), 4),
-        artefact_correctness=round(artefact_correct / max(1, artefact_questions), 4),
-        abstention_count=abstained_count,
+        answer_correctness=float(overall.get("answer_correctness") or 0.0),
+        faithfulness_pass_rate=float(faith.get("faithfulness_pass_rate") or 0.0),
+        citation_accuracy=float(overall.get("citation_accuracy") or 0.0),
+        wrong_source_rate=float(overall.get("wrong_source_rate") or 0.0),
+        artefact_correctness=float(overall.get("artefact_correctness") or 0.0),
+        abstention_count=max(0, n_total - n_answered),
     )
 
-    # Read persisted index size and ingestion_time_ms if available
     idx_dir = Path(cfg.project.index_dir)
     idx_bytes = sum(f.stat().st_size for f in idx_dir.glob("*") if f.is_file()) if idx_dir.exists() else 0
     ing_ms = ingestion_time_ms or 0.0
@@ -283,33 +228,122 @@ def evaluate_layers_b_and_c(
         except Exception:  # noqa: BLE001
             ing_ms = 0.0
 
-    def _pct(vals: list[float], q_pct: float) -> float:
-        return round(float(np.percentile(vals, q_pct)), 2) if vals else 0.0
+    ret_p50 = float(report.latency_ms.get("retrieval_p50", 0.0))
+    ret_p95 = float(report.latency_ms.get("retrieval_p95", 0.0))
+    ans_lat = answer_quality.get("latency_ms") or {}
+    gen_p50 = float(ans_lat.get("answer_p50", 0.0))
+    gen_p95 = float(ans_lat.get("answer_p95", 0.0))
 
-    mean_calls = round(sum(call_counts) / n_q, 2)
-    # Under OpenRouter's 20 req/min cap: if remote calls are made, QPM = 20 / calls_per_query;
-    # if 0 remote calls per query (local embeddings + artefact return), QPM is latency-bound,
-    # while remote generation mode (1–2 calls/query) allows 10–20 QPM under the free cap.
-    effective_remote_calls = mean_calls if mean_calls > 0 else (
-        1.0 if (not offline and cfg.answer.enable_remote_generation and get_openrouter_api_key()) else 0.0
+    remote_calls = (
+        1.0
+        if (not offline and cfg.answer.enable_remote_generation and get_openrouter_api_key())
+        else 0.0
     )
-    qpm_under_cap = (
-        round(FREE_TIER_RPM_CAP / effective_remote_calls, 2)
-        if effective_remote_calls > 0
-        else FREE_TIER_RPM_CAP  # worst-case 1 remote call/query ceiling under 20 RPM cap
-    )
+    qpm_under_cap = round(FREE_TIER_RPM_CAP / remote_calls, 2) if remote_calls > 0 else FREE_TIER_RPM_CAP
 
     layer_c = LayerCMetrics(
-        retrieval_p50_ms=_pct(ret_times, 50),
-        retrieval_p95_ms=_pct(ret_times, 95),
-        generation_p50_ms=_pct(gen_times, 50),
-        generation_p95_ms=_pct(gen_times, 95),
-        total_p50_ms=_pct(tot_times, 50),
-        total_p95_ms=_pct(tot_times, 95),
-        calls_per_query=mean_calls,
+        retrieval_p50_ms=round(ret_p50, 2),
+        retrieval_p95_ms=round(ret_p95, 2),
+        generation_p50_ms=round(gen_p50, 2),
+        generation_p95_ms=round(gen_p95, 2),
+        total_p50_ms=round(ret_p50 + gen_p50, 2),
+        total_p95_ms=round(ret_p95 + gen_p95, 2),
+        calls_per_query=remote_calls,
         ingestion_time_ms=round(ing_ms, 2),
         index_size_bytes=idx_bytes,
         queries_per_min_under_cap=qpm_under_cap,
-        rate_limit_headroom_qpm=round(max(0.0, FREE_TIER_RPM_CAP - effective_remote_calls), 2),
+        rate_limit_headroom_qpm=round(max(0.0, FREE_TIER_RPM_CAP - remote_calls), 2),
     )
-    return layer_b, layer_c, faith
+    return layer_b, layer_c
+
+
+def save_eval_report(report: EvalReport, cfg: AppConfig) -> Path:
+    rep_dir = Path(cfg.project.reports_dir)
+    rep_dir.mkdir(parents=True, exist_ok=True)
+    out_path = rep_dir / f"{report.experiment_name}.json"
+    out_path.write_text(json.dumps(report.model_dump(), indent=2), encoding="utf-8")
+    return out_path
+
+
+# ---------------------------------------------------------------------------------------------
+# Before / after comparison (E7.3 needs "the question IDs that moved")
+# ---------------------------------------------------------------------------------------------
+def _rank_key(rank: Optional[int]) -> float:
+    return float(rank) if rank else float("inf")
+
+
+def compare_reports(before: EvalReport, after: EvalReport) -> dict[str, Any]:
+    """Per-type metric deltas plus the question IDs whose strict rank improved or regressed."""
+    by_type: dict[str, dict[str, Any]] = {}
+    for u_type in sorted(set(before.by_type) | set(after.by_type)):
+        b, a = before.by_type.get(u_type), after.by_type.get(u_type)
+        if b is None or a is None:
+            continue
+        row: dict[str, Any] = {
+            "n": a.num_queries,
+            "strict_mrr": {"before": b.strict_mrr, "after": a.strict_mrr, "delta": round(a.strict_mrr - b.strict_mrr, 4)},
+            "page_mrr": {"before": b.page_mrr, "after": a.page_mrr, "delta": round(a.page_mrr - b.page_mrr, 4)},
+        }
+        for c in sorted(set(b.strict_recall_at) & set(a.strict_recall_at)):
+            row[f"strict_recall@{c}"] = {
+                "before": b.strict_recall_at[c],
+                "after": a.strict_recall_at[c],
+                "delta": round(a.strict_recall_at[c] - b.strict_recall_at[c], 4),
+            }
+        by_type[u_type] = row
+
+    before_q = {r["query_id"]: r for r in before.per_question}
+    improved, regressed = [], []
+    for r in after.per_question:
+        prev = before_q.get(r["query_id"])
+        if prev is None:
+            continue
+        b_rank, a_rank = _rank_key(prev["strict_rank"]), _rank_key(r["strict_rank"])
+        move = {
+            "query_id": r["query_id"],
+            "type": r["expected_type"],
+            "strict_rank_before": prev["strict_rank"],
+            "strict_rank_after": r["strict_rank"],
+        }
+        if a_rank < b_rank:
+            improved.append(move)
+        elif a_rank > b_rank:
+            regressed.append(move)
+
+    return {
+        "before": before.experiment_name,
+        "after": after.experiment_name,
+        "by_type": by_type,
+        "improved_question_ids": [m["query_id"] for m in improved],
+        "regressed_question_ids": [m["query_id"] for m in regressed],
+        "moves": improved + regressed,
+    }
+
+
+def failing_question_ids(report: EvalReport, unit_type: Optional[str] = None, k: int = 1) -> list[str]:
+    """Question IDs whose strict-relevant unit is not within the top `k` (the Stage 4 worklist)."""
+    return [
+        r["query_id"]
+        for r in report.per_question
+        if (unit_type is None or r["expected_type"] == unit_type) and _recall_at(r["strict_rank"], k) == 0.0
+    ]
+
+
+def load_eval_report(path: str | Path) -> EvalReport:
+    return EvalReport.model_validate(json.loads(Path(path).read_text(encoding="utf-8")))
+
+
+def _main(argv: Optional[list[str]] = None) -> int:
+    parser = argparse.ArgumentParser(prog="python -m mmrag.eval.metrics", description=__doc__.splitlines()[0])
+    sub = parser.add_subparsers(dest="command", required=True)
+    p_diff = sub.add_parser("diff", help="Compare two saved eval reports and list moved question IDs")
+    p_diff.add_argument("before")
+    p_diff.add_argument("after")
+    args = parser.parse_args(argv)
+    if args.command == "diff":
+        print(json.dumps(compare_reports(load_eval_report(args.before), load_eval_report(args.after)), indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

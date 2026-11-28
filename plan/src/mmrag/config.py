@@ -21,24 +21,31 @@ def _is_free_slug(model_id: str) -> bool:
     return model_id.endswith(":free") or model_id == "openrouter/free"
 
 
-def load_dotenv_file(dotenv_path: str | Path = ".env", override: bool = False) -> dict[str, str]:
-    """Minimal stdlib `.env` parser; strips surrounding quotes/spaces without third-party bloat."""
-    p = Path(dotenv_path)
-    loaded: dict[str, str] = {}
-    if not p.exists():
-        return loaded
-    for raw_line in p.read_text(encoding="utf-8").splitlines():
+def load_dotenv(path: str | Path = ".env", override: bool = False) -> list[str]:
+    """Loads KEY=VALUE lines from a local, git-ignored `.env` file into `os.environ` (Story E0.1).
+
+    Keeps the API key out of `config.yaml` without adding a dependency. Existing environment
+    variables win unless `override` is set. Returns the names of the variables that were set.
+    """
+    env_path = Path(path)
+    if not env_path.is_file():
+        return []
+    loaded: list[str] = []
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
-        key, _, val = line.partition("=")
-        k = key.strip()
-        v = val.strip().strip("'\"")
-        if not k:
+        if line.startswith("export "):
+            line = line[len("export "):].strip()
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1].strip()
+        if not key or (key in os.environ and not override):
             continue
-        loaded[k] = v
-        if override or k not in os.environ:
-            os.environ[k] = v
+        os.environ[key] = value
+        loaded.append(key)
     return loaded
 
 
@@ -58,19 +65,42 @@ class ProjectConfig(BaseModel):
     reports_dir: str = "reports"
 
 
+class CorpusSource(BaseModel):
+    """One real document (or a directory of documents) added on top of the gold-labelled core corpus."""
+
+    doc_id: str = Field(pattern=r"^[A-Za-z0-9_\-]+$")
+    path: str
+    url: Optional[str] = None
+    max_pages: Optional[int] = Field(default=None, ge=1)
+    enabled: bool = True
+
+
 class CorpusConfig(BaseModel):
     eval_dataset: str = "dude_slice"
     real_manual: str = "amt_handbook"
-    max_pages: int = 250
+    max_pages: int = Field(default=250, ge=1)
     gold_eval_path: str = "data/corpus/gold_eval.jsonl"
     manuals_dir: str = "data/corpus/manuals"
+    include_core_manuals: bool = True
+    downloads_dir: str = "data/corpus/downloads"
+    slices_dir: str = "data/corpus/slices"
+    real_sources: list[CorpusSource] = Field(default_factory=list)
+    extra_gold_paths: list[str] = Field(default_factory=list)
     enginuity_dir: Optional[str] = None
-    # Story E0.3: recorded prediction before running metrics
     stage0_prediction_worst_type: Literal["text", "figure", "table"] = "figure"
     stage0_prediction_reason: str = (
         "Figures contain zero native lexical text until captioned, and visually similar "
         "wiring schematics drift without nearby figure labels and model variants."
     )
+
+    @model_validator(mode="after")
+    def unique_doc_ids(self) -> "CorpusConfig":
+        seen: set[str] = set()
+        for src in self.real_sources:
+            if src.doc_id in seen:
+                raise ValueError(f"Duplicate corpus.real_sources doc_id '{src.doc_id}'.")
+            seen.add(src.doc_id)
+        return self
 
 
 class OcrQualityGateConfig(BaseModel):
@@ -78,6 +108,7 @@ class OcrQualityGateConfig(BaseModel):
     min_mean_confidence: float = 60.0
     max_garbled_char_ratio: float = 0.15
     min_alnum_token_ratio: float = 0.50
+    min_word_count: int = 10
 
 
 class IngestConfig(BaseModel):
@@ -105,8 +136,8 @@ class EnrichConfig(BaseModel):
     enforce_free_only: bool = True
     openrouter_models: list[str] = Field(
         default_factory=lambda: [
-            "nvidia/nemotron-3.5-super-vl:free",
             "google/gemma-4-31b-it:free",
+            "nvidia/nemotron-3.5-super-vl:free",
             "google/gemma-4-26b-a4b-it:free",
             "openrouter/free",
         ]
@@ -158,6 +189,7 @@ class AnswerConfig(BaseModel):
     fail_closed_on_missing_provenance: bool = True
     min_score_threshold: float = 0.05
     promote_explicit_modality_intent: bool = True
+    min_query_term_coverage: float = 0.25
     enable_remote_generation: bool = False
     enforce_free_only: bool = True
     text_model: str = "nvidia/nemotron-3-ultra-550b-a55b:free"
@@ -212,9 +244,9 @@ def _apply_env_overrides(cfg: AppConfig) -> AppConfig:
     return cfg
 
 
-def load_config(path: str | Path = "config.yaml", dotenv_path: str | Path | None = ".env") -> AppConfig:
+def load_config(path: str | Path = "config.yaml", dotenv_path: str | Path | None = None) -> AppConfig:
     if dotenv_path is not None:
-        load_dotenv_file(dotenv_path)
+        load_dotenv(dotenv_path)
     cfg_path = Path(path)
     if not cfg_path.exists():
         return _apply_env_overrides(AppConfig())

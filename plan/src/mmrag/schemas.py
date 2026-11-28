@@ -156,13 +156,18 @@ class AnswerResponse(BaseModel):
     query: str
     abstained: bool
     abstain_reason: Optional[str] = None
+    abstain_code: Optional[str] = None
     modality: Optional[UnitType] = None
     artefact: Optional[Union[str, TableArtefact]] = None
     citation: Optional[str] = None
+    citation_path: Optional[str] = None
     grounded_caption: Optional[str] = None
     grounded_answer: Optional[str] = None
+    matched_rows: list[int] = Field(default_factory=list)
+    query_term_coverage: Optional[float] = None
     source_unit: Optional[Unit] = None
     top_hits: list[SearchHit] = Field(default_factory=list)
+    dropped_hits: list[dict[str, Any]] = Field(default_factory=list)
     timings_ms: dict[str, float] = Field(default_factory=dict)
     model_calls: int = 0
 
@@ -194,23 +199,8 @@ class TypeMetrics(BaseModel):
     strict_recall_at_k: float
     strict_precision_at_k: float = 0.0
     strict_mrr: float
-
-
-class QuestionEvalResult(BaseModel):
-    """Per-question evaluation trace so before/after diffs name moved question IDs (Story E8.4)."""
-
-    query_id: str
-    expected_type: UnitType
-    gold_doc_id: str
-    gold_pages: list[int]
-    top_hit_unit_id: Optional[str] = None
-    top_hit_citation: Optional[str] = None
-    top_hit_type: Optional[UnitType] = None
-    page_rank: Optional[int] = None
-    strict_rank: Optional[int] = None
-    strict_hit_at_1: bool = False
-    strict_hit_at_3: bool = False
-    strict_hit_at_5: bool = False
+    page_recall_at: dict[int, float] = Field(default_factory=dict)
+    strict_recall_at: dict[int, float] = Field(default_factory=dict)
 
 
 class LayerBMetrics(BaseModel):
@@ -254,5 +244,8 @@ class EvalReport(BaseModel):
     faithfulness_details: list[dict[str, Any]] = Field(default_factory=list)
     layer_b: Optional[LayerBMetrics] = None
     layer_c: Optional[LayerCMetrics] = None
-    per_question: list[QuestionEvalResult] = Field(default_factory=list)
+    recall_cutoffs: list[int] = Field(default_factory=list)
+    per_question: list[dict[str, Any]] = Field(default_factory=list)
+    latency_ms: dict[str, float] = Field(default_factory=dict)
+    answer_quality: dict[str, Any] = Field(default_factory=dict)
     config_snapshot: dict[str, Any] = Field(default_factory=dict)

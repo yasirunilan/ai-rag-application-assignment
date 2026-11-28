@@ -1,6 +1,6 @@
 {
   "index_format_version": 2,
-  "built_at": "2026-11-27T19:50:23+00:00",
+  "built_at": "2026-11-28T03:02:10+00:00",
   "embedding_model_id": "deterministic-semantic-hash-v1-384d",
   "embedding_provider": "local_bge",
   "embedding_model_name": "BAAI/bge-small-en-v1.5",

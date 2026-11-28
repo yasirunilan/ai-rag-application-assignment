@@ -15,7 +15,8 @@ from mmrag.enrich.cache import CaptionCache
 from mmrag.enrich.captioner import FigureEnrichmentResult, enrich_figures
 from mmrag.enrich.rejects import RejectedUnit, reject_unenrichable, write_rejection_report
 from mmrag.enrich.table_linearizer import enrich_table_units
-from mmrag.eval.metrics import evaluate_layers_b_and_c, evaluate_retrieval_by_type
+from mmrag.eval.faithfulness import evaluate_answer_quality, run_faithfulness_spotcheck
+from mmrag.eval.metrics import build_layers_b_and_c, evaluate_retrieval_by_type, save_eval_report
 from mmrag.extract.figures import extract_figure_units
 from mmrag.extract.spotcheck import run_provenance_spotcheck
 from mmrag.extract.tables import extract_table_units, extract_text_units
@@ -188,7 +189,7 @@ class MultimodalRAGPipeline:
         k: Optional[int] = None,
         save_report: bool = True,
     ) -> EvalReport:
-        """Runs Stage 7 Layers A, B, and C evaluation + 5-sample faithfulness check."""
+        """Runs Stage 7: Layers A, B, and C evaluation + 5-answer faithfulness check."""
         if self.retriever is None:
             raise RuntimeError("Pipeline has not been indexed yet.")
         questions = load_gold_questions(self.cfg, auto_seed=True)
@@ -200,22 +201,23 @@ class MultimodalRAGPipeline:
             k=k,
             save_report=False,
         )
-        layer_b, layer_c, faith = evaluate_layers_b_and_c(
-            self.retriever,
-            questions,
+        faith = run_faithfulness_spotcheck(self.retriever, questions, self.cfg, sample_size=5)
+        answer_quality = evaluate_answer_quality(self.retriever, questions, self.cfg)
+        layer_b, layer_c = build_layers_b_and_c(
+            report,
+            faith,
+            answer_quality,
             self.cfg,
             offline=self.force_offline,
             ingestion_time_ms=self.last_ingestion_time_ms,
         )
         report.faithfulness_pass_rate = faith["faithfulness_pass_rate"]
         report.faithfulness_details = faith["reviews"]
+        report.answer_quality = answer_quality
         report.layer_b = layer_b
         report.layer_c = layer_c
 
         if save_report:
-            rep_dir = Path(self.cfg.project.reports_dir)
-            rep_dir.mkdir(parents=True, exist_ok=True)
-            out_path = rep_dir / f"{experiment_name}.json"
-            out_path.write_text(json.dumps(report.model_dump(), indent=2), encoding="utf-8")
+            save_eval_report(report, self.cfg)
 
         return report

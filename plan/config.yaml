@@ -15,12 +15,25 @@ project:
 corpus:
   eval_dataset: "dude_slice"          # Options: "dude_slice" | "enginuity_task2" | "mp_docvqa_slice"
   real_manual: "amt_handbook"         # Options: "amt_handbook" | "ifixit_guides"
-  max_pages: 250                      # Story E0.2: Cap corpus to a few hundred pages for fast iteration
+  max_pages: 250                      # Story E0.2: Global page budget (core manuals first, then real_sources in order)
   gold_eval_path: "data/corpus/gold_eval.jsonl"
-  manuals_dir: "data/corpus/manuals"
-  enginuity_dir: null                 # Optional path to Enginuity Task 2 dir (qa_dataset.json + figures/ + table_data/)
+  manuals_dir: "data/corpus/manuals"  # Core gold-labelled slice (amt_handbook + dude_hydraulic_manual)
+  include_core_manuals: true
+  downloads_dir: "data/corpus/downloads"   # git-ignored: raw real PDFs / archives
+  slices_dir: "data/corpus/slices"         # git-ignored: <doc_id>.pdf truncated FROM PAGE 1 (page numbers stay original)
+  enginuity_dir: null                      # Optional path to Enginuity Task 2 dir (qa_dataset.json + figures/ + table_data/)
   stage0_prediction_worst_type: "figure"
   stage0_prediction_reason: "Figures contain zero native lexical text until captioned, and visually similar wiring schematics drift without nearby figure labels and model variants."
+  # Real documents added on top of the core slice. Missing files are skipped with a warning (smoke stays offline).
+  real_sources:
+    - doc_id: "dude"                                     # dir source: each PDF becomes dude_<id[:12]>
+      path: "data/corpus/downloads/dude"                 # filled by `mmrag fetch-corpus --dude` (86 pages)
+    - doc_id: "faa_amt_general"                          # FAA-H-8083-30B, AMT Handbook - General (manual download)
+      path: "data/corpus/downloads/FAA-H-8083-30B.pdf"
+      max_pages: 150                                     # takes the rest of the 250-page budget
+  # Gold questions for real sources (validated; questions whose page was cut by max_pages are dropped).
+  extra_gold_paths:
+    - "data/corpus/downloads/dude_gold_eval.jsonl"     # written by `mmrag fetch-corpus --dude`
 
 ingest:
   # Story E1.1: Structural parser backend ("pymupdf" default light core | "docling" optional heavy adapter)
@@ -29,11 +42,15 @@ ingest:
   scanned_max_text_chars: 50
   scanned_min_image_coverage: 0.60
   ocr_engine: "tesseract"             # Options: "tesseract" | "heuristic_fallback"
+  # Tuned with `mmrag ocr-calibrate` (reports/ocr_gate_calibration.json, 2026-11-28): on 26 real DUDE scans every
+  # unreadable page scored conf <= 51.6 and every readable one >= 61.8, so 60 sits in the gap. The synthetic-only
+  # sweep pick (conf >= 85) was rejected: it would drop 11 readable real forms from the index (18/26 -> 7/26 indexed).
   ocr_quality_gate:
     enabled: true                     # Set false to reproduce Appendix Failure Mode: "Scanned-text noise in results"
     min_mean_confidence: 60.0         # 0-100 scale from Tesseract word-level confidences
     max_garbled_char_ratio: 0.15      # Max fraction of non-printable/symbol-noise chars
     min_alnum_token_ratio: 0.50       # Min fraction of tokens with >=2 alphanumeric chars
+    min_word_count: 10                # Partial OCR (only a heading read, at high confidence) goes to review
 
 extract:
   # Story E2.1: Figure crop export & rule/icon filter
@@ -53,8 +70,8 @@ enrich:
   vision_provider: "openrouter_free"  # Options: "openrouter_free" | "local_vision" | "offline_heuristic"
   enforce_free_only: true             # Raises BillingGuardError if any OpenRouter model lacks ':free'
   openrouter_models:
-    - "nvidia/nemotron-3.5-super-vl:free"
     - "google/gemma-4-31b-it:free"
+    - "nvidia/nemotron-3.5-super-vl:free"
     - "google/gemma-4-26b-a4b-it:free"
     - "openrouter/free"
   local_vision_model: "Qwen/Qwen2-VL-2B-Instruct"
@@ -87,6 +104,7 @@ answer:
   fail_closed_on_missing_provenance: true
   min_score_threshold: 0.05
   promote_explicit_modality_intent: true  # Promotes co-retrieved figure/table on same page when query explicitly asks for diagram/table
+  min_query_term_coverage: 0.25           # Abstain ("nothing relevant retrieved") when the cited unit covers < 25% of query terms; 0 disables
   enable_remote_generation: false         # Set true with OPENROUTER_API_KEY to synthesize cited text/vision prose via :free models
   enforce_free_only: true
   text_model: "nvidia/nemotron-3-ultra-550b-a55b:free"
