@@ -7,6 +7,10 @@ Commands:
 - `python -m mmrag.cli answer -q "..."` : Answer query with real artefact + page citation
 - `python -m mmrag.cli eval`      : Run Story E7.1 per-type Recall@k/MRR + E7.2 faithfulness check
 - `python -m mmrag.cli ablate`    : Run Story E7.3 before/after benchmarks on the 2 failure modes
+- `python -m mmrag.cli check`     : Story E0.1 model check (embeddings, vector backend, OCR, :free vision slugs)
+- `python -m mmrag.cli corpus`    : Story E0.2 corpus manifest under the `max_pages` budget
+- `python -m mmrag.cli fetch-corpus [--dude]` : Download configured real manuals / import the DUDE sample
+- `python -m mmrag.cli ocr-calibrate [--apply]` : Story E1.2 sweep of the OCR quality-gate thresholds
 """
 
 from __future__ import annotations
@@ -16,7 +20,7 @@ import json
 import sys
 from typing import Sequence
 
-from mmrag.config import load_config
+from mmrag.config import load_config, load_dotenv
 from mmrag.eval.ablations import run_e7_3_failure_mode_experiments
 from mmrag.index.embedder import create_embedder
 from mmrag.index.store import MixedVectorStore
@@ -43,6 +47,10 @@ def cmd_smoke(config_path: str) -> int:
     _print_banner("STAGE 1-4: INGEST, ROUTE, EXTRACT, ENRICH & INDEX (OFFLINE SMOKE)")
     stats = pipe.ingest_and_index(persist_index=True)
     print(json.dumps(stats, indent=2))
+    print(
+        f"\n[E1.2 OCR Gate]: {stats['num_scanned_pages']} scanned page(s), "
+        f"{stats['num_review_queued_pages']} failed the gate -> {cfg.project.review_queue_path} (not indexed)"
+    )
 
     # Story E1.1 note: show what naive flat-text loader would have dropped
     first_pdf = pipe.raw_regions[0].source_path if pipe.raw_regions else ""
@@ -141,6 +149,109 @@ def cmd_ablate(config_path: str, offline: bool) -> int:
     return 0
 
 
+def cmd_check(config_path: str, offline: bool, live_call: bool) -> int:
+    from mmrag.env_check import run_environment_check
+
+    cfg = load_config(config_path)
+    _print_banner("E0.1 ENVIRONMENT & MODEL CHECK" + (" (OFFLINE)" if offline else ""))
+    code, results = run_environment_check(cfg, offline=offline, live_call=live_call)
+    for r in results:
+        print(r.line())
+    if code == 2:
+        print("\nSTOP: OPENROUTER_API_KEY is missing (see the FAIL line above).", file=sys.stderr)
+    elif code:
+        print("\nFAIL: fix the lines marked FAIL (a slug swap is a config.yaml change only).", file=sys.stderr)
+    else:
+        print("\nAll checks passed.")
+    return code
+
+
+def cmd_corpus(config_path: str) -> int:
+    from mmrag.corpus.loader import load_gold_questions, resolve_corpus
+
+    cfg = load_config(config_path)
+    res = resolve_corpus(cfg, auto_seed=True)
+    summary = res.to_dict()
+    summary["num_gold_questions_in_corpus"] = len(load_gold_questions(cfg, restrict_to_corpus=True))
+    summary["num_gold_questions_total"] = len(load_gold_questions(cfg, restrict_to_corpus=False))
+    print(json.dumps(summary, indent=2))
+    return 0
+
+
+def cmd_fetch_corpus(config_path: str, dude: bool, dude_max_pages: int, overwrite: bool) -> int:
+    from pathlib import Path
+
+    from mmrag.corpus.sources import fetch_configured_sources, fetch_dude_sample, import_dude_sample
+
+    cfg = load_config(config_path)
+    failed = False
+    results = fetch_configured_sources(cfg, overwrite=overwrite)
+    for r in results:
+        print(json.dumps(r))
+        failed |= r["status"] != "OK"
+    if not results:
+        print("No real_sources with a `url` in config.yaml (place PDFs at their `path` manually).")
+
+    if dude:
+        dude_dir = Path(cfg.corpus.downloads_dir) / "dude"
+        gold_out = Path(cfg.corpus.downloads_dir) / "dude_gold_eval.jsonl"
+        try:
+            ds, tar = fetch_dude_sample(cfg, overwrite=overwrite)
+            summary = import_dude_sample(ds, tar, dude_dir, gold_out, max_pages=dude_max_pages)
+            print(json.dumps({k: v for k, v in summary.items() if k != "documents"}, indent=2))
+            src_paths = {Path(s.path) for s in cfg.corpus.real_sources if s.enabled}
+            if dude_dir not in src_paths or str(gold_out) not in cfg.corpus.extra_gold_paths:
+                print(
+                    "To ingest it, enable in config.yaml:\n"
+                    f"  corpus.real_sources: - {{doc_id: dude, path: {dude_dir}}}\n"
+                    f"  corpus.extra_gold_paths: [{gold_out}]"
+                )
+        except Exception as exc:  # noqa: BLE001
+            print(f"FAIL dude sample: {type(exc).__name__}: {exc}", file=sys.stderr)
+            failed = True
+    return 1 if failed else 0
+
+
+def cmd_ocr_calibrate(config_path: str, pages: int, apply: bool) -> int:
+    from mmrag.ingest.ocr_calibration import apply_thresholds_to_config_yaml, run_ocr_gate_calibration
+    from mmrag.ingest.ocr_gate import tesseract_status
+
+    ok, detail = tesseract_status()
+    if not ok:
+        print(f"FAIL: OCR calibration needs Tesseract: {detail}", file=sys.stderr)
+        return 2
+    cfg = load_config(config_path)
+    from mmrag.corpus.loader import load_corpus_manuals
+
+    rep = run_ocr_gate_calibration(cfg, load_corpus_manuals(cfg), max_reference_pages=pages)
+    _print_banner("E1.2 OCR QUALITY-GATE CALIBRATION")
+    print(f"Samples: {rep['num_samples']} ({rep['num_reference_pages']} pages x degradations), "
+          f"acceptable: {rep['num_acceptable']}")
+    for label, key in (("current", "current_thresholds"), ("recommended", "recommended_thresholds")):
+        r = rep[key]
+        print(f"  {label:<11} conf>={r['min_mean_confidence']:<5} garbled<={r['max_garbled_char_ratio']:<5} "
+              f"alnum>={r['min_alnum_token_ratio']:<5} words>={r['min_word_count']:<3} | precision={r['precision']:.3f} recall={r['recall']:.3f} "
+              f"bad_indexed={r['bad_pages_indexed']} good_flagged={r['good_pages_flagged']}")
+    print(f"Selection: {rep['selection_strategy']}")
+    real = rep["real_scanned_pages"]
+    if real:
+        for label in ("current", "recommended"):
+            n_pass = sum(r["passes"][label] for r in real)
+            print(f"  real scanned pages passing {label:<11}: {n_pass}/{len(real)}")
+        print("  Check these by eye before --apply: synthetic degradations understate real mid-confidence scans.")
+    print(f"Report: {rep['report_path']}")
+    print(f"Review by eye: {len(rep['review_by_eye']['flagged'])} flagged + {len(rep['review_by_eye']['passed'])} "
+          f"passed images under {cfg.project.data_dir}/ocr_calibration/")
+    if apply:
+        rec = rep["recommended_thresholds"]
+        changed = apply_thresholds_to_config_yaml(
+            config_path,
+            {k: rec[k] for k in ("min_mean_confidence", "max_garbled_char_ratio", "min_alnum_token_ratio", "min_word_count")},
+        )
+        print(f"Applied to {config_path}: {', '.join(changed) or 'nothing (keys not found)'}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mmrag",
@@ -166,12 +277,28 @@ def build_parser() -> argparse.ArgumentParser:
     p_ab = sub.add_parser("ablate", help="Run Before/After failure mode benchmarks (Story E7.3)")
     p_ab.add_argument("--offline", action="store_true", help="Force offline models")
 
+    p_chk = sub.add_parser("check", help="Verify embeddings, vector backend, OCR and :free vision slugs (Story E0.1)")
+    p_chk.add_argument("--offline", action="store_true", help="Skip network/key checks")
+    p_chk.add_argument("--no-live-call", action="store_true", help="Skip the one tiny vision completion call")
+
+    sub.add_parser("corpus", help="Show the corpus manifest under the max_pages budget (Story E0.2)")
+
+    p_fc = sub.add_parser("fetch-corpus", help="Download configured real manuals; --dude imports the DUDE sample")
+    p_fc.add_argument("--dude", action="store_true", help="Download + import the DUDE sample (~121 MB)")
+    p_fc.add_argument("--dude-max-pages", type=int, default=120, help="Page budget for imported DUDE docs")
+    p_fc.add_argument("--overwrite", action="store_true", help="Re-download files that already exist")
+
+    p_oc = sub.add_parser("ocr-calibrate", help="Sweep OCR gate thresholds against degraded digital pages (Story E1.2)")
+    p_oc.add_argument("--pages", type=int, default=12, help="Digital reference pages to degrade and OCR")
+    p_oc.add_argument("--apply", action="store_true", help="Write the recommended thresholds into config.yaml")
+
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    load_dotenv()  # OPENROUTER_API_KEY from a git-ignored .env, never from config.yaml
     if args.command == "smoke":
         return cmd_smoke(args.config)
     if args.command == "ingest":
@@ -184,6 +311,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         return cmd_eval(args.config, args.offline)
     if args.command == "ablate":
         return cmd_ablate(args.config, args.offline)
+    if args.command == "check":
+        return cmd_check(args.config, args.offline, not args.no_live_call)
+    if args.command == "corpus":
+        return cmd_corpus(args.config)
+    if args.command == "fetch-corpus":
+        return cmd_fetch_corpus(args.config, args.dude, args.dude_max_pages, args.overwrite)
+    if args.command == "ocr-calibrate":
+        return cmd_ocr_calibrate(args.config, args.pages, args.apply)
     return 1
 
 
