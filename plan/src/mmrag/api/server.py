@@ -177,13 +177,15 @@ def create_app(cfg: Optional[AppConfig] = None, offline: Optional[bool] = None) 
         retriever = require_ready()
         t0 = time.perf_counter()
         try:
-            hits = retriever.retrieve(req.question, k=req.k or cfg.retrieve.top_k)
+            hits = retriever.retrieve(
+                req.question,
+                k=req.k or cfg.retrieve.top_k,
+                type_filter=req.type_filter,
+            )
         except Exception as exc:  # noqa: BLE001 - embedder / upstream failure
             raise HTTPException(
                 status_code=502, detail={"kind": "upstream", "message": f"{type(exc).__name__}: {exc}"}
             ) from exc
-        if req.type_filter:
-            hits = [h for h in hits if h.unit.type == req.type_filter]
         t1 = time.perf_counter()
         ans = build_answer_from_hits(req.question, hits, cfg)
         t2 = time.perf_counter()

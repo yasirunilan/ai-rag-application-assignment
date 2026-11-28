@@ -67,15 +67,10 @@ class Unit(BaseModel):
     provenance: Provenance
 
     def has_valid_provenance(self, verify_files: bool = True) -> bool:
-        """Fail-closed provenance verification (Story E2.3 & E6.2).
-
-        A unit is only sourced if:
-        1. doc_id is non-empty
-        2. page is an integer >= 1
-        3. unit_id is non-empty
-        4. Its artefact is present (and for figures, the image file exists on disk).
-        """
-        if not self.provenance.doc_id or not self.provenance.unit_id:
+        """Fail-closed provenance verification (Story E2.3 & E6.2)."""
+        if not self.provenance.doc_id or not self.provenance.unit_id or not self.unit_id:
+            return False
+        if self.provenance.unit_id != self.unit_id:
             return False
         if self.provenance.page is None or int(self.provenance.page) < 1:
             return False
@@ -165,8 +160,11 @@ class AnswerResponse(BaseModel):
     artefact: Optional[Union[str, TableArtefact]] = None
     citation: Optional[str] = None
     grounded_caption: Optional[str] = None
+    grounded_answer: Optional[str] = None
     source_unit: Optional[Unit] = None
     top_hits: list[SearchHit] = Field(default_factory=list)
+    timings_ms: dict[str, float] = Field(default_factory=dict)
+    model_calls: int = 0
 
 
 class GoldQuestion(BaseModel):
@@ -182,18 +180,68 @@ class GoldQuestion(BaseModel):
 
 
 class TypeMetrics(BaseModel):
-    """Recall@k and MRR metrics for a specific content type (Story E7.1)."""
+    """Recall@k, Precision@k, and MRR metrics for a specific content type (Story E7.1 / Layer A)."""
 
     unit_type: str
     num_queries: int
+    page_recall_at_1: float = 0.0
+    page_recall_at_3: float = 0.0
     page_recall_at_k: float
+    page_precision_at_k: float = 0.0
     page_mrr: float
+    strict_recall_at_1: float = 0.0
+    strict_recall_at_3: float = 0.0
     strict_recall_at_k: float
+    strict_precision_at_k: float = 0.0
     strict_mrr: float
 
 
+class QuestionEvalResult(BaseModel):
+    """Per-question evaluation trace so before/after diffs name moved question IDs (Story E8.4)."""
+
+    query_id: str
+    expected_type: UnitType
+    gold_doc_id: str
+    gold_pages: list[int]
+    top_hit_unit_id: Optional[str] = None
+    top_hit_citation: Optional[str] = None
+    top_hit_type: Optional[UnitType] = None
+    page_rank: Optional[int] = None
+    strict_rank: Optional[int] = None
+    strict_hit_at_1: bool = False
+    strict_hit_at_3: bool = False
+    strict_hit_at_5: bool = False
+
+
+class LayerBMetrics(BaseModel):
+    """Answer and grounding metrics reported after retrieval (Story E8.2 / Layer B)."""
+
+    answer_correctness: float
+    faithfulness_pass_rate: float
+    citation_accuracy: float
+    wrong_source_rate: float
+    artefact_correctness: float
+    abstention_count: int = 0
+
+
+class LayerCMetrics(BaseModel):
+    """Operational metrics for field usability under free-tier caps (Story E8.3 / Layer C)."""
+
+    retrieval_p50_ms: float
+    retrieval_p95_ms: float
+    generation_p50_ms: float
+    generation_p95_ms: float
+    total_p50_ms: float
+    total_p95_ms: float
+    calls_per_query: float
+    ingestion_time_ms: float = 0.0
+    index_size_bytes: int = 0
+    queries_per_min_under_cap: float
+    rate_limit_headroom_qpm: float
+
+
 class EvalReport(BaseModel):
-    """Complete evaluation report across all types + faithfulness checks (Story E7.1–E7.3)."""
+    """Complete evaluation report across Layers A, B, and C (Stories E7.1–E7.3 / E8.1–E8.6)."""
 
     experiment_name: str
     k: int
@@ -204,4 +252,7 @@ class EvalReport(BaseModel):
     by_type: dict[str, TypeMetrics]
     faithfulness_pass_rate: Optional[float] = None
     faithfulness_details: list[dict[str, Any]] = Field(default_factory=list)
+    layer_b: Optional[LayerBMetrics] = None
+    layer_c: Optional[LayerCMetrics] = None
+    per_question: list[QuestionEvalResult] = Field(default_factory=list)
     config_snapshot: dict[str, Any] = Field(default_factory=dict)

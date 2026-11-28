@@ -3,6 +3,7 @@ pyproject.toml
 src/mmrag/__init__.py
 src/mmrag/cli.py
 src/mmrag/config.py
+src/mmrag/diagnostics.py
 src/mmrag/pipeline.py
 src/mmrag/schemas.py
 src/mmrag.egg-info/PKG-INFO
@@ -13,12 +14,15 @@ src/mmrag.egg-info/requires.txt
 src/mmrag.egg-info/top_level.txt
 src/mmrag/answer/__init__.py
 src/mmrag/answer/responder.py
+src/mmrag/api/__init__.py
+src/mmrag/api/server.py
 src/mmrag/corpus/__init__.py
 src/mmrag/corpus/loader.py
 src/mmrag/corpus/synthetic.py
 src/mmrag/enrich/__init__.py
 src/mmrag/enrich/cache.py
 src/mmrag/enrich/captioner.py
+src/mmrag/enrich/rejects.py
 src/mmrag/enrich/table_linearizer.py
 src/mmrag/eval/__init__.py
 src/mmrag/eval/ablations.py
@@ -37,6 +41,7 @@ src/mmrag/ingest/ocr_gate.py
 src/mmrag/ingest/router.py
 src/mmrag/retrieve/__init__.py
 src/mmrag/retrieve/retriever.py
+tests/test_api_service.py
 tests/test_p1_env_and_ocr.py
 tests/test_p2_parse_extract.py
 tests/test_p3_enrich.py

@@ -1,4 +1,9 @@
 {
+  "index_format_version": 2,
+  "built_at": "2026-11-27T19:50:23+00:00",
+  "embedding_model_id": "deterministic-semantic-hash-v1-384d",
+  "embedding_provider": "local_bge",
+  "embedding_model_name": "BAAI/bge-small-en-v1.5",
   "total_units": 10,
   "embedding_dim": 384,
   "type_counts": {
@@ -6,5 +11,6 @@
     "figure": 3,
     "table": 2
   },
+  "rejected_units": 0,
   "has_faiss_file": true
 }

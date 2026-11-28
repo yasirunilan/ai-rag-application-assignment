@@ -1,4 +1,4 @@
-"""Faithfulness Spot-Checker: Catches 'Right Text, Wrong Figure' & Flattened Tables (Person 5 · Story E7.2).
+"""Faithfulness Spot-Checker: Catches 'Right Text, Wrong Figure' & Flattened Tables (Person 5 · Stories E7.2 / E8.6).
 
 Reviews five answers end-to-end against gold evidence pages and flags the most
 dangerous failure mode: an answer that sounds plausible / returns an image,
@@ -7,12 +7,23 @@ but shows the WRONG figure or a flattened mush table.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from mmrag.answer.responder import build_answer_from_hits
 from mmrag.config import AppConfig
 from mmrag.retrieve.retriever import HybridRetriever
 from mmrag.schemas import GoldQuestion, TableArtefact
+
+
+def _is_valid_png_file(path_str: str) -> bool:
+    p = Path(path_str)
+    if not p.exists() or not p.is_file():
+        return False
+    try:
+        return p.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+    except OSError:
+        return False
 
 
 def run_faithfulness_spotcheck(
@@ -22,7 +33,6 @@ def run_faithfulness_spotcheck(
     sample_size: int = 5,
 ) -> dict[str, Any]:
     """Reviews `sample_size` answers and flags any wrong-artefact or wrong-figure response (Story E7.2)."""
-    # Pick a stratified 5-question sample prioritizing figures and tables
     figures = [q for q in questions if q.expected_type == "figure"]
     tables = [q for q in questions if q.expected_type == "table"]
     texts = [q for q in questions if q.expected_type == "text"]
@@ -35,10 +45,11 @@ def run_faithfulness_spotcheck(
     reviews: list[dict[str, Any]] = []
     passed_count = 0
     flagged_wrong_artefact_count = 0
+    wrong_figure_count = 0
 
     for q in sampled:
         hits = retriever.retrieve(q.query, k=cfg.retrieve.top_k)
-        ans = build_answer_from_hits(q.query, hits, cfg)
+        ans = build_answer_from_hits(q.query, hits, cfg, offline=True)
 
         if ans.abstained or ans.source_unit is None:
             reviews.append(
@@ -61,7 +72,6 @@ def run_faithfulness_spotcheck(
         page_ok = (u.provenance.page is not None) and (int(u.provenance.page) in q.gold_pages)
         mod_ok = ans.modality == q.expected_type
 
-        # Check hint & structure
         hint_ok = True
         if q.gold_artefact_hint:
             combined_meta = " ".join(
@@ -74,8 +84,14 @@ def run_faithfulness_spotcheck(
             hint_ok = q.gold_artefact_hint.lower() in combined_meta.lower()
 
         structure_ok = True
-        if q.expected_type == "table" and not isinstance(ans.artefact, TableArtefact):
-            structure_ok = False
+        if q.expected_type == "table":
+            structure_ok = (
+                isinstance(ans.artefact, TableArtefact)
+                and bool(ans.artefact.headers)
+                and bool(ans.artefact.rows)
+            )
+        elif q.expected_type == "figure":
+            structure_ok = isinstance(ans.artefact, str) and _is_valid_png_file(ans.artefact)
 
         faithful = doc_ok and page_ok and mod_ok and hint_ok and structure_ok
         flag = "OK_EXACT_ARTEFACT"
@@ -83,6 +99,7 @@ def run_faithfulness_spotcheck(
             flagged_wrong_artefact_count += 1
             if q.expected_type == "figure" and ans.modality == "figure" and not (doc_ok and page_ok and hint_ok):
                 flag = "DANGEROUS_WRONG_FIGURE_DRIFT"
+                wrong_figure_count += 1
             elif q.expected_type == "table" and not structure_ok:
                 flag = "TABLE_FLATTENED_MUSH"
             elif not mod_ok:
@@ -100,6 +117,7 @@ def run_faithfulness_spotcheck(
                 "gold_citation": f"{q.gold_doc_id} p.{q.gold_pages[0]}",
                 "gold_hint": q.gold_artefact_hint,
                 "returned_citation": ans.citation,
+                "returned_unit_id": u.unit_id,
                 "returned_modality": ans.modality,
                 "grounded_caption": ans.grounded_caption,
                 "faithful": faithful,
@@ -112,6 +130,7 @@ def run_faithfulness_spotcheck(
         "reviewed_count": len(sampled),
         "passed_count": passed_count,
         "flagged_wrong_artefact_count": flagged_wrong_artefact_count,
+        "wrong_figure_count": wrong_figure_count,
         "faithfulness_pass_rate": pass_rate,
         "reviews": reviews,
     }

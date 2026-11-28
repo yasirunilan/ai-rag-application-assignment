@@ -152,7 +152,8 @@ class HybridRetriever:
             weight_alpha = 1.0
         pool_size = max(top_k, int(self.cfg.retrieve.candidate_pool_size or 0))
 
-        # 1. Dense candidate pool (type filter applied inside the vector search)
+        # 1. Dense candidate pool (verify model match BEFORE embedding the query)
+        self.store.assert_queryable()
         q_vec = self.store.embedder.embed_texts([query])
         dense_pairs = self.store.search_dense(query, top_k=pool_size, unit_types=types, query_vector=q_vec)
         dense_by_row: dict[int, float] = {idx: s for idx, s in dense_pairs}

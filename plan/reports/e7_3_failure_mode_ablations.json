@@ -3,46 +3,181 @@
     "overall_strict_mrr": 0.7361,
     "figure_strict_mrr": 0.5833,
     "table_strict_mrr": 0.875,
-    "faithfulness_pass_rate": 0.2
+    "faithfulness_pass_rate": 0.2,
+    "by_type": {
+      "text": {
+        "n": 4.0,
+        "recall_at_1": 0.5,
+        "recall_at_3": 1.0,
+        "recall_at_5": 1.0,
+        "mrr": 0.75
+      },
+      "figure": {
+        "n": 4.0,
+        "recall_at_1": 0.25,
+        "recall_at_3": 1.0,
+        "recall_at_5": 1.0,
+        "mrr": 0.5833
+      },
+      "table": {
+        "n": 4.0,
+        "recall_at_1": 0.75,
+        "recall_at_3": 1.0,
+        "recall_at_5": 1.0,
+        "mrr": 0.875
+      }
+    }
   },
   "failure_mode_1_right_text_wrong_figure": {
     "symptom": "Caption-image drift causes wrong relay diagram (p.2) to outrank starter relay diagram (p.3)",
+    "root_cause": "Vision captioning saw only internal schematic shapes without the PDF's nearby figure label, heading, or aircraft model variant",
     "fix": "Inject nearby figure label, section heading, and model variant into vision caption prompt & search_text",
+    "improved_question_ids": [
+      "Q_FIG_01",
+      "Q_FIG_03",
+      "Q_FIG_04"
+    ],
+    "regressed_question_ids": [],
     "before": {
       "figure_page_recall_at_k": 1.0,
       "figure_page_mrr": 0.875,
       "figure_strict_recall_at_k": 1.0,
       "figure_strict_mrr": 0.4167,
-      "faithfulness_pass_rate": 0.6
+      "faithfulness_pass_rate": 0.6,
+      "by_type": {
+        "text": {
+          "n": 4.0,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "figure": {
+          "n": 4.0,
+          "recall_at_1": 0.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "mrr": 0.4167
+        },
+        "table": {
+          "n": 4.0,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        }
+      }
     },
     "after": {
       "figure_page_recall_at_k": 1.0,
       "figure_page_mrr": 1.0,
       "figure_strict_recall_at_k": 1.0,
       "figure_strict_mrr": 0.875,
-      "faithfulness_pass_rate": 1.0
+      "faithfulness_pass_rate": 1.0,
+      "by_type": {
+        "text": {
+          "n": 4.0,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "figure": {
+          "n": 4.0,
+          "recall_at_1": 0.75,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "mrr": 0.875
+        },
+        "table": {
+          "n": 4.0,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        }
+      }
     },
     "delta_figure_strict_mrr": 0.4583,
     "delta_faithfulness": 0.4
   },
   "failure_mode_2_table_mush_and_exact_codes": {
-    "symptom": "Flattened table string loses column structure and dense vectors smear exact part/fault codes (AN4-12A, FAULT-E409)",
+    "symptom": "Flattened table string loses column structure and dense vectors smear exact part/fault codes (AN4-12A, NAS1304-15, FAULT-E409)",
+    "root_cause": "Flattening destroys 2D cell-header bindings and dense embeddings map distinct alphanumeric part codes into a shared generic cluster",
     "fix": "Keep structured TableArtefact + col=val row linearization + BM25 lexical fusion (alpha=0.60)",
+    "improved_question_ids": [
+      "Q_TAB_02"
+    ],
+    "regressed_question_ids": [],
     "before": {
       "table_page_recall_at_k": 1.0,
       "table_page_mrr": 0.875,
       "table_strict_recall_at_k": 1.0,
       "table_strict_mrr": 0.875,
-      "faithfulness_pass_rate": 0.6
+      "faithfulness_pass_rate": 0.6,
+      "by_type": {
+        "text": {
+          "n": 4.0,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "figure": {
+          "n": 4.0,
+          "recall_at_1": 0.75,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "mrr": 0.875
+        },
+        "table": {
+          "n": 4.0,
+          "recall_at_1": 0.75,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "mrr": 0.875
+        }
+      }
     },
     "after": {
       "table_page_recall_at_k": 1.0,
       "table_page_mrr": 1.0,
       "table_strict_recall_at_k": 1.0,
       "table_strict_mrr": 1.0,
-      "faithfulness_pass_rate": 1.0
+      "faithfulness_pass_rate": 1.0,
+      "by_type": {
+        "text": {
+          "n": 4.0,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        },
+        "figure": {
+          "n": 4.0,
+          "recall_at_1": 0.75,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "mrr": 0.875
+        },
+        "table": {
+          "n": 4.0,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "mrr": 1.0
+        }
+      }
     },
     "delta_table_strict_mrr": 0.125,
     "delta_faithfulness": 0.4
+  },
+  "cost_levers": {
+    "naive_every_page_vision_calls": 6,
+    "selective_first_run_vision_calls": 3,
+    "cached_rerun_vision_calls": 0,
+    "unbatched_unit_embed_calls": 10,
+    "batch_16_unit_embed_calls": 1,
+    "calls_saved_on_rerun": 15
   }
 }

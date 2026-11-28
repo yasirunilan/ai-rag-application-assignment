@@ -9,25 +9,43 @@
     "text": {
       "unit_type": "text",
       "num_queries": 4,
+      "page_recall_at_1": 1.0,
+      "page_recall_at_3": 1.0,
       "page_recall_at_k": 1.0,
+      "page_precision_at_k": 0.35,
       "page_mrr": 1.0,
+      "strict_recall_at_1": 1.0,
+      "strict_recall_at_3": 1.0,
       "strict_recall_at_k": 1.0,
+      "strict_precision_at_k": 0.2,
       "strict_mrr": 1.0
     },
     "figure": {
       "unit_type": "figure",
       "num_queries": 4,
+      "page_recall_at_1": 1.0,
+      "page_recall_at_3": 1.0,
       "page_recall_at_k": 1.0,
+      "page_precision_at_k": 0.4,
       "page_mrr": 1.0,
+      "strict_recall_at_1": 0.75,
+      "strict_recall_at_3": 1.0,
       "strict_recall_at_k": 1.0,
+      "strict_precision_at_k": 0.2,
       "strict_mrr": 0.875
     },
     "table": {
       "unit_type": "table",
       "num_queries": 4,
+      "page_recall_at_1": 0.75,
+      "page_recall_at_3": 1.0,
       "page_recall_at_k": 1.0,
+      "page_precision_at_k": 0.3,
       "page_mrr": 0.875,
+      "strict_recall_at_1": 0.75,
+      "strict_recall_at_3": 1.0,
       "strict_recall_at_k": 1.0,
+      "strict_precision_at_k": 0.2,
       "strict_mrr": 0.875
     }
   },
@@ -40,6 +58,7 @@
       "gold_citation": "amt_handbook p.3",
       "gold_hint": "Figure 9-14",
       "returned_citation": "amt_handbook p.3",
+      "returned_unit_id": "amt_handbook__p0003__figure_001",
       "returned_modality": "figure",
       "grounded_caption": "Figure 9-14. Engine Starter Relay Control Wiring Diagram (Model 737-800)",
       "faithful": true,
@@ -52,6 +71,7 @@
       "gold_citation": "amt_handbook p.2",
       "gold_hint": "Figure 9-12",
       "returned_citation": "amt_handbook p.2",
+      "returned_unit_id": "amt_handbook__p0002__figure_001",
       "returned_modality": "figure",
       "grounded_caption": "Figure 9-12. Generator Control Relay & Bus Tie Schematic (Model 737-400)",
       "faithful": true,
@@ -64,6 +84,7 @@
       "gold_citation": "amt_handbook p.1",
       "gold_hint": "Table 4-1",
       "returned_citation": "amt_handbook p.1",
+      "returned_unit_id": "amt_handbook__p0001__table_001",
       "returned_modality": "table",
       "grounded_caption": "Table 4-1. Standard Airframe Bolt Torque Specifications (Model 737-800)",
       "faithful": false,
@@ -76,6 +97,7 @@
       "gold_citation": "amt_handbook p.1",
       "gold_hint": "Table 4-1",
       "returned_citation": "dude_hydraulic_manual p.1",
+      "returned_unit_id": "dude_hydraulic_manual__p0001__table_001",
       "returned_modality": "table",
       "grounded_caption": "Table 2-3. Hydraulic Electronic Monitoring Fault Codes & Corrective Actions",
       "faithful": false,
@@ -88,10 +110,226 @@
       "gold_citation": "amt_handbook p.1",
       "gold_hint": "3,000 PSI",
       "returned_citation": "amt_handbook p.1",
+      "returned_unit_id": "amt_handbook__p0001__text_001",
       "returned_modality": "text",
       "grounded_caption": null,
       "faithful": true,
       "flag": "OK_EXACT_ARTEFACT"
+    }
+  ],
+  "layer_b": {
+    "answer_correctness": 0.9167,
+    "faithfulness_pass_rate": 0.6,
+    "citation_accuracy": 0.9167,
+    "wrong_source_rate": 0.0833,
+    "artefact_correctness": 0.5,
+    "abstention_count": 0
+  },
+  "layer_c": {
+    "retrieval_p50_ms": 0.15,
+    "retrieval_p95_ms": 0.17,
+    "generation_p50_ms": 0.08,
+    "generation_p95_ms": 0.1,
+    "total_p50_ms": 0.22,
+    "total_p95_ms": 0.25,
+    "calls_per_query": 0.0,
+    "ingestion_time_ms": 243.03,
+    "index_size_bytes": 49322,
+    "queries_per_min_under_cap": 20.0,
+    "rate_limit_headroom_qpm": 20.0
+  },
+  "per_question": [
+    {
+      "query_id": "Q_FIG_01",
+      "expected_type": "figure",
+      "gold_doc_id": "amt_handbook",
+      "gold_pages": [
+        3
+      ],
+      "top_hit_unit_id": "amt_handbook__p0003__figure_001",
+      "top_hit_citation": "amt_handbook p.3",
+      "top_hit_type": "figure",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "strict_hit_at_1": true,
+      "strict_hit_at_3": true,
+      "strict_hit_at_5": true
+    },
+    {
+      "query_id": "Q_FIG_02",
+      "expected_type": "figure",
+      "gold_doc_id": "amt_handbook",
+      "gold_pages": [
+        2
+      ],
+      "top_hit_unit_id": "amt_handbook__p0002__text_001",
+      "top_hit_citation": "amt_handbook p.2",
+      "top_hit_type": "text",
+      "page_rank": 1,
+      "strict_rank": 2,
+      "strict_hit_at_1": false,
+      "strict_hit_at_3": true,
+      "strict_hit_at_5": true
+    },
+    {
+      "query_id": "Q_FIG_03",
+      "expected_type": "figure",
+      "gold_doc_id": "dude_hydraulic_manual",
+      "gold_pages": [
+        2
+      ],
+      "top_hit_unit_id": "dude_hydraulic_manual__p0002__figure_001",
+      "top_hit_citation": "dude_hydraulic_manual p.2",
+      "top_hit_type": "figure",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "strict_hit_at_1": true,
+      "strict_hit_at_3": true,
+      "strict_hit_at_5": true
+    },
+    {
+      "query_id": "Q_FIG_04",
+      "expected_type": "figure",
+      "gold_doc_id": "amt_handbook",
+      "gold_pages": [
+        3
+      ],
+      "top_hit_unit_id": "amt_handbook__p0003__figure_001",
+      "top_hit_citation": "amt_handbook p.3",
+      "top_hit_type": "figure",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "strict_hit_at_1": true,
+      "strict_hit_at_3": true,
+      "strict_hit_at_5": true
+    },
+    {
+      "query_id": "Q_TAB_01",
+      "expected_type": "table",
+      "gold_doc_id": "amt_handbook",
+      "gold_pages": [
+        1
+      ],
+      "top_hit_unit_id": "amt_handbook__p0001__table_001",
+      "top_hit_citation": "amt_handbook p.1",
+      "top_hit_type": "table",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "strict_hit_at_1": true,
+      "strict_hit_at_3": true,
+      "strict_hit_at_5": true
+    },
+    {
+      "query_id": "Q_TAB_02",
+      "expected_type": "table",
+      "gold_doc_id": "amt_handbook",
+      "gold_pages": [
+        1
+      ],
+      "top_hit_unit_id": "dude_hydraulic_manual__p0001__table_001",
+      "top_hit_citation": "dude_hydraulic_manual p.1",
+      "top_hit_type": "table",
+      "page_rank": 2,
+      "strict_rank": 2,
+      "strict_hit_at_1": false,
+      "strict_hit_at_3": true,
+      "strict_hit_at_5": true
+    },
+    {
+      "query_id": "Q_TAB_03",
+      "expected_type": "table",
+      "gold_doc_id": "dude_hydraulic_manual",
+      "gold_pages": [
+        1
+      ],
+      "top_hit_unit_id": "dude_hydraulic_manual__p0001__table_001",
+      "top_hit_citation": "dude_hydraulic_manual p.1",
+      "top_hit_type": "table",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "strict_hit_at_1": true,
+      "strict_hit_at_3": true,
+      "strict_hit_at_5": true
+    },
+    {
+      "query_id": "Q_TAB_04",
+      "expected_type": "table",
+      "gold_doc_id": "dude_hydraulic_manual",
+      "gold_pages": [
+        1
+      ],
+      "top_hit_unit_id": "dude_hydraulic_manual__p0001__table_001",
+      "top_hit_citation": "dude_hydraulic_manual p.1",
+      "top_hit_type": "table",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "strict_hit_at_1": true,
+      "strict_hit_at_3": true,
+      "strict_hit_at_5": true
+    },
+    {
+      "query_id": "Q_TXT_01",
+      "expected_type": "text",
+      "gold_doc_id": "amt_handbook",
+      "gold_pages": [
+        1
+      ],
+      "top_hit_unit_id": "amt_handbook__p0001__text_001",
+      "top_hit_citation": "amt_handbook p.1",
+      "top_hit_type": "text",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "strict_hit_at_1": true,
+      "strict_hit_at_3": true,
+      "strict_hit_at_5": true
+    },
+    {
+      "query_id": "Q_TXT_02",
+      "expected_type": "text",
+      "gold_doc_id": "dude_hydraulic_manual",
+      "gold_pages": [
+        1
+      ],
+      "top_hit_unit_id": "dude_hydraulic_manual__p0001__text_001",
+      "top_hit_citation": "dude_hydraulic_manual p.1",
+      "top_hit_type": "text",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "strict_hit_at_1": true,
+      "strict_hit_at_3": true,
+      "strict_hit_at_5": true
+    },
+    {
+      "query_id": "Q_TXT_03",
+      "expected_type": "text",
+      "gold_doc_id": "amt_handbook",
+      "gold_pages": [
+        3
+      ],
+      "top_hit_unit_id": "amt_handbook__p0003__text_001",
+      "top_hit_citation": "amt_handbook p.3",
+      "top_hit_type": "text",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "strict_hit_at_1": true,
+      "strict_hit_at_3": true,
+      "strict_hit_at_5": true
+    },
+    {
+      "query_id": "Q_TXT_04",
+      "expected_type": "text",
+      "gold_doc_id": "amt_handbook",
+      "gold_pages": [
+        2
+      ],
+      "top_hit_unit_id": "amt_handbook__p0002__text_001",
+      "top_hit_citation": "amt_handbook p.2",
+      "top_hit_type": "text",
+      "page_rank": 1,
+      "strict_rank": 1,
+      "strict_hit_at_1": true,
+      "strict_hit_at_3": true,
+      "strict_hit_at_5": true
     }
   ],
   "config_snapshot": {

@@ -1,8 +1,8 @@
 """Scanned Page Detector & OCR Quality Gate (Person 1 · Story E1.2).
 
-Detects image-only pages (no/minimal text layer + page-filling image), renders and OCRs them,
-scores mean confidence + garbled-char ratio, and sends sub-threshold pages to `review_queue.jsonl`
-instead of the index.
+Detects image-only pages AND scanned pages carrying a dirty/garbled hidden text layer,
+renders and OCRs them, scores mean confidence + garbled-char ratio + alnum-token ratio,
+and routes sub-threshold pages to `review_queue.jsonl` instead of the index.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import json
 import re
 import shutil
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import fitz
 import numpy as np
@@ -53,8 +53,9 @@ def is_scanned_page(
 ) -> tuple[bool, int, float]:
     """Detects whether a PDF page is a scanned image page (Story E1.2).
 
-    Returns:
-        (is_scanned, text_char_count, image_coverage_ratio)
+    Handles both classic image-only scans (`text_char_count <= max_text_chars`) AND
+    full-page scans carrying a corrupted/garbled invisible OCR layer (`coverage >= 0.80`
+    and `garbled_ratio > 0.25`).
     """
     clean_text = page.get_text("text").strip()
     text_char_count = len(clean_text)
@@ -69,8 +70,13 @@ def is_scanned_page(
                 image_area += rect.width * rect.height
 
     coverage = min(1.0, image_area / page_area)
-    is_scanned = (text_char_count <= max_text_chars) and (coverage >= min_image_coverage)
-    return is_scanned, text_char_count, coverage
+    image_only_scan = (text_char_count <= max_text_chars) and (coverage >= min_image_coverage)
+    dirty_hidden_ocr_scan = (
+        coverage >= 0.80
+        and text_char_count > max_text_chars
+        and compute_garbled_char_ratio(clean_text) > 0.25
+    )
+    return (image_only_scan or dirty_hidden_ocr_scan), text_char_count, coverage
 
 
 def _find_tesseract_cmd() -> Optional[str]:
@@ -116,7 +122,6 @@ def run_ocr_on_page(page: fitz.Page, engine: str = "tesseract") -> tuple[str, fl
     # Deterministic offline fallback when Tesseract system binary is absent on host
     arr = np.asarray(img.convert("L"), dtype=np.float32)
     contrast_std = float(np.std(arr))
-    # High horizontal line noise / low contrast indicates degraded microfiche scan
     row_means = np.mean(arr, axis=1)
     row_oscillation = float(np.mean(np.abs(np.diff(row_means))))
     if row_oscillation > 3.0 or contrast_std < 38.0:
@@ -137,11 +142,7 @@ def evaluate_ocr_quality_gate(
     cfg: AppConfig,
     append_to_queue: bool = True,
 ) -> tuple[bool, float, float, list[str]]:
-    """Scores OCR output and sends sub-threshold pages to review_queue.jsonl (Story E1.2).
-
-    Returns:
-        (passed_gate, garbled_ratio, alnum_ratio, failure_reasons)
-    """
+    """Scores OCR output and sends sub-threshold pages to review_queue.jsonl (Story E1.2)."""
     garbled_ratio = compute_garbled_char_ratio(ocr_text)
     alnum_ratio = compute_alnum_token_ratio(ocr_text)
     gate_cfg = cfg.ingest.ocr_quality_gate
@@ -167,17 +168,37 @@ def evaluate_ocr_quality_gate(
     if len(reasons) > 0 and append_to_queue and gate_cfg.enabled:
         q_path = Path(cfg.project.review_queue_path)
         q_path.parent.mkdir(parents=True, exist_ok=True)
-        item = ReviewQueueItem(
-            doc_id=doc_id,
-            page=page_num,
-            source_path=source_path,
-            mean_confidence=round(mean_confidence, 2),
-            garbled_char_ratio=round(garbled_ratio, 4),
-            alnum_token_ratio=round(alnum_ratio, 4),
-            failure_reasons=reasons,
-            raw_ocr_preview=ocr_text[:200],
-        )
-        with q_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(item.model_dump(), ensure_ascii=False) + "\n")
+        existing_keys: set[tuple[str, int]] = set()
+        if q_path.exists():
+            for line in q_path.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    row = json.loads(line)
+                    existing_keys.add((row.get("doc_id", ""), int(row.get("page", 0))))
+        if (doc_id, page_num) not in existing_keys:
+            item = ReviewQueueItem(
+                doc_id=doc_id,
+                page=page_num,
+                source_path=source_path,
+                mean_confidence=round(mean_confidence, 2),
+                garbled_char_ratio=round(garbled_ratio, 4),
+                alnum_token_ratio=round(alnum_ratio, 4),
+                failure_reasons=reasons,
+                raw_ocr_preview=ocr_text[:200],
+            )
+            with q_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(item.model_dump(), ensure_ascii=False) + "\n")
 
     return passed, garbled_ratio, alnum_ratio, reasons
+
+
+def summarize_review_queue(queue_path: str | Path) -> dict[str, Any]:
+    """Story E1.2: Reads `review_queue.jsonl` and reports failed scanned page count & reasons."""
+    p = Path(queue_path)
+    if not p.exists():
+        return {"failed_pages_count": 0, "items": []}
+    items = [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return {
+        "failed_pages_count": len(items),
+        "pages": [f"{it['doc_id']} p.{it['page']}" for it in items],
+        "items": items,
+    }

@@ -1,5 +1,5 @@
 # Course 3 — Day 2 · Lab A: Multimodal Retrieval Configuration
-# Every model and failure-mode ablation toggle is controlled from this single file.
+# Every model and failure-mode ablation toggle is controlled from this single file (or .env).
 # Non-negotiable: No paid API key is permitted on the default path (:free enforced in code).
 
 project:
@@ -9,14 +9,18 @@ project:
   cache_dir: "data/cache/captions"
   index_dir: "data/index"
   review_queue_path: "data/review_queue.jsonl"
+  enrichment_rejects_path: "data/rejected_enrichment_units.jsonl"
   reports_dir: "reports"
 
 corpus:
-  eval_dataset: "dude_slice"          # Options: "dude_slice" | "mp_docvqa_slice"
+  eval_dataset: "dude_slice"          # Options: "dude_slice" | "enginuity_task2" | "mp_docvqa_slice"
   real_manual: "amt_handbook"         # Options: "amt_handbook" | "ifixit_guides"
   max_pages: 250                      # Story E0.2: Cap corpus to a few hundred pages for fast iteration
   gold_eval_path: "data/corpus/gold_eval.jsonl"
   manuals_dir: "data/corpus/manuals"
+  enginuity_dir: null                 # Optional path to Enginuity Task 2 dir (qa_dataset.json + figures/ + table_data/)
+  stage0_prediction_worst_type: "figure"
+  stage0_prediction_reason: "Figures contain zero native lexical text until captioned, and visually similar wiring schematics drift without nearby figure labels and model variants."
 
 ingest:
   # Story E1.1: Structural parser backend ("pymupdf" default light core | "docling" optional heavy adapter)
@@ -49,10 +53,9 @@ enrich:
   vision_provider: "openrouter_free"  # Options: "openrouter_free" | "local_vision" | "offline_heuristic"
   enforce_free_only: true             # Raises BillingGuardError if any OpenRouter model lacks ':free'
   openrouter_models:
-    - "qwen/qwen2.5-vl-72b-instruct:free"
-    - "qwen/qwen2.5-vl-7b-instruct:free"
-    - "meta-llama/llama-3.2-11b-vision-instruct:free"
-    - "mistralai/mistral-small-3.1-24b-instruct:free"
+    - "nvidia/nemotron-3.5-super-vl:free"
+    - "google/gemma-4-31b-it:free"
+    - "google/gemma-4-26b-a4b-it:free"
     - "openrouter/free"
   local_vision_model: "Qwen/Qwen2-VL-2B-Instruct"
   cache_enabled: true
@@ -66,6 +69,7 @@ index:
   # Story E4.1 & E4.2: Single mixed index over text + figure + table with provenance metadata
   embedding_provider: "local_bge"     # Options: "local_bge" (fastembed bge-small-en-v1.5) | "deterministic_hash" (offline smoke)
   embedding_model_name: "BAAI/bge-small-en-v1.5"
+  openrouter_embed_model: "nvidia/nemotron-3.5-embed-1b:free"
   embedding_dim: 384
   vector_backend: "faiss_or_numpy"    # Uses FAISS IndexFlatIP if faiss-cpu installed, else exact L2-normalized NumPy IP
   prose_chunk_max_chars: 750
@@ -83,3 +87,7 @@ answer:
   fail_closed_on_missing_provenance: true
   min_score_threshold: 0.05
   promote_explicit_modality_intent: true  # Promotes co-retrieved figure/table on same page when query explicitly asks for diagram/table
+  enable_remote_generation: false         # Set true with OPENROUTER_API_KEY to synthesize cited text/vision prose via :free models
+  enforce_free_only: true
+  text_model: "nvidia/nemotron-3-ultra-550b-a55b:free"
+  figure_model: "nvidia/nemotron-3.5-super-vl:free"
