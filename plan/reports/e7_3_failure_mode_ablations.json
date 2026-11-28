@@ -1,13 +1,65 @@
 {
+  "evaluation_note": "Synthetic 2-manual corpus with 12 gold questions (4 per type), offline embedder and captioner. The fixes were designed on the same gold questions they are reported on (no held-out split), so absolute numbers are optimistic; the before/after deltas are the evidence.",
   "untuned_baseline": {
     "overall_strict_mrr": 0.7361,
     "figure_strict_mrr": 0.5833,
     "table_strict_mrr": 0.875,
-    "faithfulness_pass_rate": 0.2
+    "faithfulness_pass_rate": 0.2,
+    "by_type": {
+      "text": {
+        "n": 4,
+        "recall@1": 0.5,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 0.75,
+        "precision@k": 0.2,
+        "page_mrr": 0.875
+      },
+      "figure": {
+        "n": 4,
+        "recall@1": 0.25,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 0.5833,
+        "precision@k": 0.2,
+        "page_mrr": 0.75
+      },
+      "table": {
+        "n": 4,
+        "recall@1": 0.75,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 0.875,
+        "precision@k": 0.2,
+        "page_mrr": 0.875
+      }
+    },
+    "layer_b": {
+      "faithfulness_pass_rate": 0.2,
+      "answer_correctness": 0.5833,
+      "citation_accuracy": 0.8,
+      "wrong_source_rate": 0.2,
+      "artefact_correctness": 0.25
+    }
   },
   "failure_mode_1_right_text_wrong_figure": {
     "symptom": "Caption-image drift causes wrong relay diagram (p.2) to outrank starter relay diagram (p.3)",
+    "hypothesis": "Figure crops are indistinguishable by caption alone; adding their label, section and model variant will rank the gold figure first.",
+    "root_cause": "Figure search_text is the bare vision caption: two relay schematics share most callouts and nothing ties a crop to its 'Figure 9-14' label or model variant.",
     "fix": "Inject nearby figure label, section heading, and model variant into vision caption prompt & search_text",
+    "change": "enrich.include_nearby_context: false -> true",
+    "target_type": "figure",
+    "before_experiment": "fm1_before_caption_drift",
+    "after_experiment": "fm1_after_context_grounded_caption",
+    "failing_question_ids_before": [
+      "Q_FIG_01",
+      "Q_FIG_02",
+      "Q_FIG_03",
+      "Q_FIG_04"
+    ],
+    "failing_question_ids_after": [
+      "Q_FIG_02"
+    ],
     "before": {
       "figure_page_recall_at_k": 1.0,
       "figure_page_mrr": 0.875,
@@ -23,11 +75,210 @@
       "faithfulness_pass_rate": 1.0
     },
     "delta_figure_strict_mrr": 0.4583,
-    "delta_faithfulness": 0.4
+    "delta_faithfulness": 0.4,
+    "by_type_before": {
+      "text": {
+        "n": 4,
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 1.0,
+        "precision@k": 0.2,
+        "page_mrr": 1.0
+      },
+      "figure": {
+        "n": 4,
+        "recall@1": 0.0,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 0.4167,
+        "precision@k": 0.2,
+        "page_mrr": 0.875
+      },
+      "table": {
+        "n": 4,
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 1.0,
+        "precision@k": 0.2,
+        "page_mrr": 1.0
+      }
+    },
+    "by_type_after": {
+      "text": {
+        "n": 4,
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 1.0,
+        "precision@k": 0.2,
+        "page_mrr": 1.0
+      },
+      "figure": {
+        "n": 4,
+        "recall@1": 0.75,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 0.875,
+        "precision@k": 0.2,
+        "page_mrr": 1.0
+      },
+      "table": {
+        "n": 4,
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 1.0,
+        "precision@k": 0.2,
+        "page_mrr": 1.0
+      }
+    },
+    "layer_b_before": {
+      "faithfulness_pass_rate": 0.6,
+      "answer_correctness": 0.6667,
+      "citation_accuracy": 0.9167,
+      "wrong_source_rate": 0.0833,
+      "artefact_correctness": 0.5
+    },
+    "layer_b_after": {
+      "faithfulness_pass_rate": 1.0,
+      "answer_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "wrong_source_rate": 0.0,
+      "artefact_correctness": 1.0
+    },
+    "moved": {
+      "before": "fm1_before_caption_drift",
+      "after": "fm1_after_context_grounded_caption",
+      "by_type": {
+        "figure": {
+          "n": 4,
+          "strict_mrr": {
+            "before": 0.4167,
+            "after": 0.875,
+            "delta": 0.4583
+          },
+          "page_mrr": {
+            "before": 0.875,
+            "after": 1.0,
+            "delta": 0.125
+          },
+          "strict_recall@1": {
+            "before": 0.0,
+            "after": 0.75,
+            "delta": 0.75
+          },
+          "strict_recall@3": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "strict_recall@5": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          }
+        },
+        "table": {
+          "n": 4,
+          "strict_mrr": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "page_mrr": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "strict_recall@1": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "strict_recall@3": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "strict_recall@5": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          }
+        },
+        "text": {
+          "n": 4,
+          "strict_mrr": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "page_mrr": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "strict_recall@1": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "strict_recall@3": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "strict_recall@5": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          }
+        }
+      },
+      "improved_question_ids": [
+        "Q_FIG_01",
+        "Q_FIG_03",
+        "Q_FIG_04"
+      ],
+      "regressed_question_ids": [],
+      "moves": [
+        {
+          "query_id": "Q_FIG_01",
+          "type": "figure",
+          "strict_rank_before": 3,
+          "strict_rank_after": 1
+        },
+        {
+          "query_id": "Q_FIG_03",
+          "type": "figure",
+          "strict_rank_before": 2,
+          "strict_rank_after": 1
+        },
+        {
+          "query_id": "Q_FIG_04",
+          "type": "figure",
+          "strict_rank_before": 3,
+          "strict_rank_after": 1
+        }
+      ]
+    },
+    "measured_move": true
   },
   "failure_mode_2_table_mush_and_exact_codes": {
     "symptom": "Flattened table string loses column structure and dense vectors smear exact part/fault codes (AN4-12A, FAULT-E409)",
+    "hypothesis": "Keeping the table structured, binding each cell to its header, and adding exact-token BM25 will return the right table and row.",
+    "root_cause": "Tables were flattened to one string (artefact and search text), so header/value binding was lost, and dense-only retrieval does not match exact identifiers.",
     "fix": "Keep structured TableArtefact + col=val row linearization + BM25 lexical fusion (alpha=0.60)",
+    "change": "extract.flatten_tables: true -> false; enrich.table_linearization_mode: flat_raw -> col_val_and_markdown; retrieve.enable_bm25_fusion: false -> true (alpha 1.0 -> 0.60) \u2014 applied and measured one at a time",
+    "target_type": "table",
+    "before_experiment": "fm2_before_flat_table_vector_only",
+    "after_experiment": "fm2_after_structured_colval_bm25",
+    "failing_question_ids_before": [
+      "Q_TAB_02"
+    ],
+    "failing_question_ids_after": [],
     "before": {
       "table_page_recall_at_k": 1.0,
       "table_page_mrr": 0.875,
@@ -43,6 +294,559 @@
       "faithfulness_pass_rate": 1.0
     },
     "delta_table_strict_mrr": 0.125,
-    "delta_faithfulness": 0.4
+    "delta_faithfulness": 0.4,
+    "by_type_before": {
+      "text": {
+        "n": 4,
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 1.0,
+        "precision@k": 0.2,
+        "page_mrr": 1.0
+      },
+      "figure": {
+        "n": 4,
+        "recall@1": 0.75,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 0.875,
+        "precision@k": 0.2,
+        "page_mrr": 1.0
+      },
+      "table": {
+        "n": 4,
+        "recall@1": 0.75,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 0.875,
+        "precision@k": 0.2,
+        "page_mrr": 0.875
+      }
+    },
+    "by_type_after": {
+      "text": {
+        "n": 4,
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 1.0,
+        "precision@k": 0.2,
+        "page_mrr": 1.0
+      },
+      "figure": {
+        "n": 4,
+        "recall@1": 0.75,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 0.875,
+        "precision@k": 0.2,
+        "page_mrr": 1.0
+      },
+      "table": {
+        "n": 4,
+        "recall@1": 1.0,
+        "recall@3": 1.0,
+        "recall@5": 1.0,
+        "mrr": 1.0,
+        "precision@k": 0.2,
+        "page_mrr": 1.0
+      }
+    },
+    "layer_b_before": {
+      "faithfulness_pass_rate": 0.6,
+      "answer_correctness": 0.9167,
+      "citation_accuracy": 1.0,
+      "wrong_source_rate": 0.0,
+      "artefact_correctness": 0.5
+    },
+    "layer_b_after": {
+      "faithfulness_pass_rate": 1.0,
+      "answer_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "wrong_source_rate": 0.0,
+      "artefact_correctness": 1.0
+    },
+    "moved": {
+      "before": "fm2_before_flat_table_vector_only",
+      "after": "fm2_after_structured_colval_bm25",
+      "by_type": {
+        "figure": {
+          "n": 4,
+          "strict_mrr": {
+            "before": 0.875,
+            "after": 0.875,
+            "delta": 0.0
+          },
+          "page_mrr": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "strict_recall@1": {
+            "before": 0.75,
+            "after": 0.75,
+            "delta": 0.0
+          },
+          "strict_recall@3": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "strict_recall@5": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          }
+        },
+        "table": {
+          "n": 4,
+          "strict_mrr": {
+            "before": 0.875,
+            "after": 1.0,
+            "delta": 0.125
+          },
+          "page_mrr": {
+            "before": 0.875,
+            "after": 1.0,
+            "delta": 0.125
+          },
+          "strict_recall@1": {
+            "before": 0.75,
+            "after": 1.0,
+            "delta": 0.25
+          },
+          "strict_recall@3": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "strict_recall@5": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          }
+        },
+        "text": {
+          "n": 4,
+          "strict_mrr": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "page_mrr": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "strict_recall@1": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "strict_recall@3": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          },
+          "strict_recall@5": {
+            "before": 1.0,
+            "after": 1.0,
+            "delta": 0.0
+          }
+        }
+      },
+      "improved_question_ids": [
+        "Q_TAB_02"
+      ],
+      "regressed_question_ids": [],
+      "moves": [
+        {
+          "query_id": "Q_TAB_02",
+          "type": "table",
+          "strict_rank_before": 2,
+          "strict_rank_after": 1
+        }
+      ]
+    },
+    "measured_move": true,
+    "steps": [
+      {
+        "step": "a",
+        "change": "extract.flatten_tables: true -> false",
+        "experiment": "fm2_step_a_structured_artefact",
+        "table": {
+          "n": 4,
+          "recall@1": 0.5,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 0.75,
+          "precision@k": 0.2,
+          "page_mrr": 0.875
+        },
+        "delta_table_strict_mrr": -0.125,
+        "delta_table_artefact_correctness": 0.25,
+        "delta_faithfulness": 0.2,
+        "improved_question_ids": [
+          "Q_TAB_02"
+        ],
+        "regressed_question_ids": [
+          "Q_TAB_01",
+          "Q_TAB_03"
+        ]
+      },
+      {
+        "step": "b",
+        "change": "enrich.table_linearization_mode: flat_raw -> col_val_and_markdown",
+        "experiment": "fm2_step_b_col_val_linearization",
+        "table": {
+          "n": 4,
+          "recall@1": 0.75,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 0.875,
+          "precision@k": 0.2,
+          "page_mrr": 0.875
+        },
+        "delta_table_strict_mrr": 0.125,
+        "delta_table_artefact_correctness": 0.125,
+        "delta_faithfulness": 0.0,
+        "improved_question_ids": [
+          "Q_TAB_01",
+          "Q_TAB_03"
+        ],
+        "regressed_question_ids": [
+          "Q_TAB_02"
+        ]
+      },
+      {
+        "step": "c",
+        "change": "retrieve.enable_bm25_fusion: false -> true (alpha 1.0 -> 0.60)",
+        "experiment": "fm2_after_structured_colval_bm25",
+        "table": {
+          "n": 4,
+          "recall@1": 1.0,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0,
+          "precision@k": 0.2,
+          "page_mrr": 1.0
+        },
+        "delta_table_strict_mrr": 0.125,
+        "delta_table_artefact_correctness": 0.125,
+        "delta_faithfulness": 0.2,
+        "improved_question_ids": [
+          "Q_TAB_02"
+        ],
+        "regressed_question_ids": []
+      }
+    ]
+  },
+  "t2_cumulative": [
+    {
+      "stage": "Baseline",
+      "experiment": "baseline_untuned",
+      "by_type": {
+        "text": {
+          "n": 4,
+          "recall@1": 0.5,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 0.75,
+          "precision@k": 0.2,
+          "page_mrr": 0.875
+        },
+        "figure": {
+          "n": 4,
+          "recall@1": 0.25,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 0.5833,
+          "precision@k": 0.2,
+          "page_mrr": 0.75
+        },
+        "table": {
+          "n": 4,
+          "recall@1": 0.75,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 0.875,
+          "precision@k": 0.2,
+          "page_mrr": 0.875
+        }
+      },
+      "layer_b": {
+        "faithfulness_pass_rate": 0.2,
+        "answer_correctness": 0.5833,
+        "citation_accuracy": 0.8,
+        "wrong_source_rate": 0.2,
+        "artefact_correctness": 0.25
+      }
+    },
+    {
+      "stage": "After fix 1",
+      "experiment": "fm2_before_flat_table_vector_only",
+      "by_type": {
+        "text": {
+          "n": 4,
+          "recall@1": 1.0,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0,
+          "precision@k": 0.2,
+          "page_mrr": 1.0
+        },
+        "figure": {
+          "n": 4,
+          "recall@1": 0.75,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 0.875,
+          "precision@k": 0.2,
+          "page_mrr": 1.0
+        },
+        "table": {
+          "n": 4,
+          "recall@1": 0.75,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 0.875,
+          "precision@k": 0.2,
+          "page_mrr": 0.875
+        }
+      },
+      "layer_b": {
+        "faithfulness_pass_rate": 0.6,
+        "answer_correctness": 0.9167,
+        "citation_accuracy": 1.0,
+        "wrong_source_rate": 0.0,
+        "artefact_correctness": 0.5
+      }
+    },
+    {
+      "stage": "After fix 2",
+      "experiment": "fm2_after_structured_colval_bm25",
+      "by_type": {
+        "text": {
+          "n": 4,
+          "recall@1": 1.0,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0,
+          "precision@k": 0.2,
+          "page_mrr": 1.0
+        },
+        "figure": {
+          "n": 4,
+          "recall@1": 0.75,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 0.875,
+          "precision@k": 0.2,
+          "page_mrr": 1.0
+        },
+        "table": {
+          "n": 4,
+          "recall@1": 1.0,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0,
+          "precision@k": 0.2,
+          "page_mrr": 1.0
+        }
+      },
+      "layer_b": {
+        "faithfulness_pass_rate": 1.0,
+        "answer_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "wrong_source_rate": 0.0,
+        "artefact_correctness": 1.0
+      }
+    },
+    {
+      "stage": "Final",
+      "experiment": "fm2_after_structured_colval_bm25",
+      "by_type": {
+        "text": {
+          "n": 4,
+          "recall@1": 1.0,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0,
+          "precision@k": 0.2,
+          "page_mrr": 1.0
+        },
+        "figure": {
+          "n": 4,
+          "recall@1": 0.75,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 0.875,
+          "precision@k": 0.2,
+          "page_mrr": 1.0
+        },
+        "table": {
+          "n": 4,
+          "recall@1": 1.0,
+          "recall@3": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0,
+          "precision@k": 0.2,
+          "page_mrr": 1.0
+        }
+      },
+      "layer_b": {
+        "faithfulness_pass_rate": 1.0,
+        "answer_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "wrong_source_rate": 0.0,
+        "artefact_correctness": 1.0
+      }
+    }
+  ],
+  "baseline_vs_final": {
+    "before": "baseline_untuned",
+    "after": "fm2_after_structured_colval_bm25",
+    "by_type": {
+      "figure": {
+        "n": 4,
+        "strict_mrr": {
+          "before": 0.5833,
+          "after": 0.875,
+          "delta": 0.2917
+        },
+        "page_mrr": {
+          "before": 0.75,
+          "after": 1.0,
+          "delta": 0.25
+        },
+        "strict_recall@1": {
+          "before": 0.25,
+          "after": 0.75,
+          "delta": 0.5
+        },
+        "strict_recall@3": {
+          "before": 1.0,
+          "after": 1.0,
+          "delta": 0.0
+        },
+        "strict_recall@5": {
+          "before": 1.0,
+          "after": 1.0,
+          "delta": 0.0
+        }
+      },
+      "table": {
+        "n": 4,
+        "strict_mrr": {
+          "before": 0.875,
+          "after": 1.0,
+          "delta": 0.125
+        },
+        "page_mrr": {
+          "before": 0.875,
+          "after": 1.0,
+          "delta": 0.125
+        },
+        "strict_recall@1": {
+          "before": 0.75,
+          "after": 1.0,
+          "delta": 0.25
+        },
+        "strict_recall@3": {
+          "before": 1.0,
+          "after": 1.0,
+          "delta": 0.0
+        },
+        "strict_recall@5": {
+          "before": 1.0,
+          "after": 1.0,
+          "delta": 0.0
+        }
+      },
+      "text": {
+        "n": 4,
+        "strict_mrr": {
+          "before": 0.75,
+          "after": 1.0,
+          "delta": 0.25
+        },
+        "page_mrr": {
+          "before": 0.875,
+          "after": 1.0,
+          "delta": 0.125
+        },
+        "strict_recall@1": {
+          "before": 0.5,
+          "after": 1.0,
+          "delta": 0.5
+        },
+        "strict_recall@3": {
+          "before": 1.0,
+          "after": 1.0,
+          "delta": 0.0
+        },
+        "strict_recall@5": {
+          "before": 1.0,
+          "after": 1.0,
+          "delta": 0.0
+        }
+      }
+    },
+    "improved_question_ids": [
+      "Q_FIG_01",
+      "Q_FIG_03",
+      "Q_FIG_04",
+      "Q_TAB_02",
+      "Q_TXT_01",
+      "Q_TXT_04"
+    ],
+    "regressed_question_ids": [
+      "Q_FIG_02"
+    ],
+    "moves": [
+      {
+        "query_id": "Q_FIG_01",
+        "type": "figure",
+        "strict_rank_before": 3,
+        "strict_rank_after": 1
+      },
+      {
+        "query_id": "Q_FIG_03",
+        "type": "figure",
+        "strict_rank_before": 2,
+        "strict_rank_after": 1
+      },
+      {
+        "query_id": "Q_FIG_04",
+        "type": "figure",
+        "strict_rank_before": 2,
+        "strict_rank_after": 1
+      },
+      {
+        "query_id": "Q_TAB_02",
+        "type": "table",
+        "strict_rank_before": 2,
+        "strict_rank_after": 1
+      },
+      {
+        "query_id": "Q_TXT_01",
+        "type": "text",
+        "strict_rank_before": 2,
+        "strict_rank_after": 1
+      },
+      {
+        "query_id": "Q_TXT_04",
+        "type": "text",
+        "strict_rank_before": 2,
+        "strict_rank_after": 1
+      },
+      {
+        "query_id": "Q_FIG_02",
+        "type": "figure",
+        "strict_rank_before": 1,
+        "strict_rank_after": 2
+      }
+    ]
   }
 }
